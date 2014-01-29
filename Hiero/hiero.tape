@@ -159,28 +159,29 @@ task TuneWithMert
     :: cdec_dir=@
     :: .submitter=shell .walltime="48:00:00" .cpus=32 .vmem=60g .q=normal {
   initialWeights="./initialWeights.txt"
-  echo 'PassThrough_6 -0.00699001065989
-EgivenFCoherent -0.143753598764
-SampleCountF 0.0670507378596
-MaxLexEgivenF 0.0533512109614
-PassThrough -0.223671632264
-PassThrough_3 -0.0596159465362
-LanguageModel 0.272887994276
-PassThrough_4 -0.0756845014188
-PassThrough_5 -0.0630230674949
-PassThrough_2 -0.0165592335722
-IsSingletonF 0.025706841532
-IsSingletonFE -0.0523385640397
-PassThrough_1 -0.00179887258152
-MaxLexFgivenE -0.0946672851272
-LanguageModel_OOV -0.22058847817
-Glue -0.15449154903
-WordPenalty -0.0677495426343
-NonLatinCount -0.01
-RuleShape 0.00
-CountEF 0.19419531547' > $initialWeights
+  echo 'CountEF 0.19419531547'            >> $initialWeights
+  echo 'EgivenFCoherent -0.143753598764'  >> $initialWeights
+  echo 'Glue -0.15449154903'              >> $initialWeights
+  echo 'LanguageModel 0.272887994276'     >> $initialWeights
+  echo 'MaxLexEgivenF 0.0533512109614'    >> $initialWeights
+  echo 'MaxLexFgivenE -0.0946672851272'   >> $initialWeights
+  echo 'IsSingletonF 0.025706841532'      >> $initialWeights
+  echo 'IsSingletonFE -0.0523385640397'   >> $initialWeights
+  echo 'LanguageModel_OOV -0.22058847817' >> $initialWeights
+  echo 'NonLatinCount -0.01'              >> $initialWeights
+  echo 'PassThrough -0.223671632264'      >> $initialWeights
+  echo 'PassThrough_1 -0.00179887258152'  >> $initialWeights
+  echo 'PassThrough_2 -0.0165592335722'   >> $initialWeights
+  echo 'PassThrough_3 -0.0596159465362'   >> $initialWeights
+  echo 'PassThrough_4 -0.0756845014188'   >> $initialWeights
+  echo 'PassThrough_5 -0.0630230674949'   >> $initialWeights
+  echo 'PassThrough_6 -0.00699001065989'  >> $initialWeights
+  echo 'SampleCountF 0.0670507378596'     >> $initialWeights
+  echo 'WordPenalty -0.0677495426343'     >> $initialWeights
+
   cp $cdec_ini ./cdec.ini
   echo 'density_prune=100.0' >> cdec.ini
+
   perl $cdec_dir/training/dpmert/dpmert.pl --devset $tune_set --weights $initialWeights --jobs $cores --output-dir $mert_work --config ./cdec.ini
   ln -s $mert_work/weights.final $optimized_weights
 }
