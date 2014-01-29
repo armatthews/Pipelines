@@ -133,8 +133,17 @@ task MakeCdecIni
   echo "add_pass_through_rules=true" >> $cdec_ini
   echo "feature_function=KLanguageModel $language_model" >> $cdec_ini
   echo "feature_function=WordPenalty" >> $cdec_ini
+
+  # Moar features!!1
   echo "feature_function=NonLatinCount" >> $cdec_ini
   echo "feature_function=RuleShape" >> $cdec_ini
+  echo "feature_function=NgramFeatures -o 2 -c /mal0/cdyer/www/en-c600.gz" >> $cdec_ini
+  echo "feature_function=ArityPenalty" >> $cdec_ini
+  echo "feature_function=SourcePathFeatures" >> $cdec_ini
+
+  # Slower, but better output, especially in syntactically divergent language pairs 
+  echo "scfg_max_span_limit=18" >> $cdec_ini
+  echo "cubepruning_pop_limit=1200" >> $cdec_ini # Try 650 if 1200 is too slow
 }
 
 task Tune
