@@ -43,7 +43,7 @@ task FilterCorpus
     :: cdec_dir=@
     :: .submitter=shell .walltime="01:00:00" .cpus=1 .vmem=2g .q=shared {
   if (( $max_sentence_length > 0 )); then
-    $cdec_dir/corpus/filter-length.pl -$max_sentence_length $corpus > $filtered_corpus
+    $cdec_dir/corpus/filter-length.pl $max_sentence_length $corpus > $filtered_corpus
   else
     cp $corpus $filtered_corpus
   fi
@@ -185,6 +185,7 @@ task TuneWithMert
   perl $cdec_dir/training/dpmert/dpmert.pl --devset $tune_set --weights $initialWeights --jobs $cores --output-dir $mert_work --config ./cdec.ini
   ln -s $mert_work/weights.final $optimized_weights
 }
+
 task Decode
     < test_set=(TuneOrTest:
         test=$wrapped_corpus@ExtractGrammars[ExtractSection:test]
