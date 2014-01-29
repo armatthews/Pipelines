@@ -1,0 +1,38 @@
+global {
+  # Output directory:
+  ducttape_output="/home/armatthe/Research/Systems/FBIS-moses/"
+
+  # Parameters:
+  source="/home/armatthe/Research/FBIS/source.txt"
+  target="/home/armatthe/Research/FBIS/target.txt"
+
+  tuneSetSource="/home/armatthe/Research/FBIS/TestSets/mt06/source.txt"
+  tuneSetRefs="/home/armatthe/Research/FBIS/TestSets/mt06/target.txt.*"
+
+  testSetSource=(PickTestSet: mt03="/home/armatthe/Research/FBIS/TestSets/mt03/source.txt" mt08="/home/armatthe/Research/FBIS/TestSets/mt08/source.txt")
+  testSetRefs=(PickTestSet: mt03="/home/armatthe/Research/FBIS/TestSets/mt03/target.txt.*" mt08="/home/armatthe/Research/FBIS/TestSets/mt08/target.txt.*")
+
+  alignment="/home/armatthe/Research/FBIS/alignment.txt"
+  languageModel="/oasis/projects/nsf/cmu126/ghannema/lms/c2e.3gram.trie"
+}
+
+global {
+  tuning_run_number=(TuningRun: 1 2 3)
+
+  decode_cores=32
+
+  meteor_lang="other"
+ 
+  moses="/home/armatthe/git/mosesdecoder"
+  multeval="/home/armatthe/git/timber/multeval/multeval.sh"
+
+  ttable_limit = 20
+  reordering_model_type=msd-bidirectional-fe
+  distortion_limit=7
+  max_phrase_length=7
+  n_best_size=500
+}
+
+plan Full {
+   reach Evaluate via (TuneOrTest: test tune) * (TuningRun: 1 2 3) * (PickTestSet: mt03 mt08)
+}

@@ -1,0 +1,31 @@
+global {
+  # Output directory:
+  ducttape_output="/home/armatthe/Research/Systems/FBIS-hiero/"
+
+  train_corpus="/home/armatthe/FBIS/fbis.zhen"
+  tune_corpus="/home/armatthe/FBIS/TestSets/mt06/mt06.zhen"
+  test_corpus=(PickTestSet: mt03="/home/armatthe/FBIS/TestSets/mt03/mt03.zhen"
+			    mt08="/home/armatthe/FBIS/TestSets/mt08/mt08.zhen")
+
+  alignment="/home/armatthe/Research/FBIS/alignment.txt"
+  lm_data="/dev/null"
+
+  language_model="/oasis/projects/nsf/cmu126/ghannema/lms/c2e.3gram.trie"
+}
+
+global {
+  tokenize_corpus="false"
+  lowercase_corpus="false"
+  lm_order=4
+  decode_cores=16
+
+  max_sentence_length=0
+  meteor_lang="other"
+
+  cdec_dir="/home/armatthe/git/timber/cdec/"
+  multeval="/home/armatthe/git/timber/multeval/multeval.sh"
+}
+
+plan Full {
+  reach Evaluate via (TuneOrTest: test tune) * (UseCustomAlignment: yes) * (UseCustomLM: yes) * (PickTestSet: mt03 mt08)
+}

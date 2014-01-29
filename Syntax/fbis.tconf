@@ -1,0 +1,40 @@
+global {
+   # Output directory:
+   ducttape_output="/home/armatthe/Research/Systems/FBIS-NewCdec/"
+
+   # Input data files:
+        source="/home/armatthe/Research/FBIS/source.txt"
+        target="/home/armatthe/Research/FBIS/target.txt"
+   sourceTrees="/home/armatthe/Research/FBIS/source-trees.txt"
+   targetTrees="/home/armatthe/Research/FBIS/target-trees.txt"
+     alignment="/home/armatthe/Research/FBIS/alignment.txt"
+
+   tuneSetSource="/home/armatthe/Research/FBIS/TestSets/mt06/source.txt"
+   tuneSetSourceTrees="/home/armatthe/Research/FBIS/TestSets/mt06/source-trees.txt"
+   tuneSetRefs="/home/armatthe/Research/FBIS/TestSets/mt06/target.txt.*"
+
+   testSetSource=(PickTestSet: mt03="/home/armatthe/Research/FBIS/TestSets/mt03/source.txt" mt08="/home/armatthe/Research/FBIS/TestSets/mt08/source.txt")
+   testSetSourceTrees=(PickTestSet: mt03="/home/armatthe/Research/FBIS/TestSets/mt03/source-trees.txt" mt08="/home/armatthe/Research/FBIS/TestSets/mt08/source-trees.txt")
+   testSetRefs=(PickTestSet: mt03="/home/armatthe/Research/FBIS/TestSets/mt03/target.txt.*" mt08="/home/armatthe/Research/FBIS/TestSets/mt08/target.txt.*") 
+
+   # Parameters:
+   # Note: small LM wants "ASCII" quotes, but large LM wants ``LaTeX'' quotes
+   languageModel=(LM:
+                    small="/oasis/projects/nsf/cmu126/ghannema/lms/c2e.3gram.trie"
+                    large="/oasis/projects/nsf/cmu126/ghannema/lms/fbis-gigaword-fix.5.trie")
+
+   filteringCores=32
+   grammarExtractionCores=32
+   decodeCores=12
+   timberRoot="/home/armatthe/git/timber-branch"
+   scriptDir="/home/armatthe/git/timber-branch/timber_scripts"
+   tuningRunNumber=(TuningRunNumber: 1..3)
+
+   sortCores="32"
+   sortRAM="20G"
+   sortTempDir="."
+}
+
+plan Full {
+  reach Evaluate via (TuneOrTest: test tune) * (PickTestSet: mt03 mt08) * (Optimizer: mira) * (TuningRunNumber: 1) * (LM: large) * (UseNewFeatures: yes)
+}

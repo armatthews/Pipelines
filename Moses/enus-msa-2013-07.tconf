@@ -1,0 +1,156 @@
+global {
+  # Output directory:
+  ducttape_output="/home/armatthe/Research/Systems/enus-msa-2013-08-moses/"
+
+  # Parameters:
+  source="/home/armatthe/Research/ArabicSystem/data/source.txt"
+  target="/home/armatthe/Research/ArabicSystem/data/target.new.txt"
+
+  tuneSetSource="/home/armatthe/Research/ArabicSystem/data/mt08/source.txt"
+  tuneSetRefs="/home/armatthe/Research/ArabicSystem/data/mt08/target.txt"
+
+  testSetSource=(PickTestSet:
+                   mt09="/home/armatthe/Research/ArabicSystem/data/mt09/source.txt"
+                   training_data00="/home/armatthe/Research/ArabicSystem/data/Split/source00"
+                   training_data01="/home/armatthe/Research/ArabicSystem/data/Split/source01"
+                   training_data02="/home/armatthe/Research/ArabicSystem/data/Split/source02"
+                   training_data03="/home/armatthe/Research/ArabicSystem/data/Split/source03"
+                   training_data04="/home/armatthe/Research/ArabicSystem/data/Split/source04"
+                   training_data05="/home/armatthe/Research/ArabicSystem/data/Split/source05"
+                   training_data06="/home/armatthe/Research/ArabicSystem/data/Split/source06"
+                   training_data07="/home/armatthe/Research/ArabicSystem/data/Split/source07"
+                   training_data08="/home/armatthe/Research/ArabicSystem/data/Split/source08"
+                   training_data09="/home/armatthe/Research/ArabicSystem/data/Split/source09"
+                   training_data10="/home/armatthe/Research/ArabicSystem/data/Split/source10"
+                   training_data11="/home/armatthe/Research/ArabicSystem/data/Split/source11"
+                   training_data12="/home/armatthe/Research/ArabicSystem/data/Split/source12"
+                   training_data13="/home/armatthe/Research/ArabicSystem/data/Split/source13"
+                   training_data14="/home/armatthe/Research/ArabicSystem/data/Split/source14"
+                   training_data15="/home/armatthe/Research/ArabicSystem/data/Split/source15"
+                   training_data16="/home/armatthe/Research/ArabicSystem/data/Split/source16"
+                   training_data17="/home/armatthe/Research/ArabicSystem/data/Split/source17"
+                   training_data18="/home/armatthe/Research/ArabicSystem/data/Split/source18"
+                   training_data19="/home/armatthe/Research/ArabicSystem/data/Split/source19"
+                   training_data20="/home/armatthe/Research/ArabicSystem/data/Split/source20"
+                   training_data21="/home/armatthe/Research/ArabicSystem/data/Split/source21"
+                   training_data22="/home/armatthe/Research/ArabicSystem/data/Split/source22"
+                   training_data23="/home/armatthe/Research/ArabicSystem/data/Split/source23"
+                   training_data24="/home/armatthe/Research/ArabicSystem/data/Split/source24"
+                   training_data25="/home/armatthe/Research/ArabicSystem/data/Split/source25"
+                   training_data26="/home/armatthe/Research/ArabicSystem/data/Split/source26"
+                   training_data27="/home/armatthe/Research/ArabicSystem/data/Split/source27"
+                   training_data28="/home/armatthe/Research/ArabicSystem/data/Split/source28"
+                   training_data29="/home/armatthe/Research/ArabicSystem/data/Split/source29"
+                   training_data30="/home/armatthe/Research/ArabicSystem/data/Split/source30"
+                   training_data31="/home/armatthe/Research/ArabicSystem/data/Split/source31"
+                   training_data32="/home/armatthe/Research/ArabicSystem/data/Split/source32"
+                   training_data33="/home/armatthe/Research/ArabicSystem/data/Split/source33"
+                   training_data34="/home/armatthe/Research/ArabicSystem/data/Split/source34"
+                   training_data35="/home/armatthe/Research/ArabicSystem/data/Split/source35"
+                   training_data36="/home/armatthe/Research/ArabicSystem/data/Split/source36"
+                   training_data37="/home/armatthe/Research/ArabicSystem/data/Split/source37"
+                   training_data38="/home/armatthe/Research/ArabicSystem/data/Split/source38"
+                   training_data39="/home/armatthe/Research/ArabicSystem/data/Split/source39"
+                   training_data40="/home/armatthe/Research/ArabicSystem/data/Split/source40"
+                   training_data41="/home/armatthe/Research/ArabicSystem/data/Split/source41"
+                   training_data42="/home/armatthe/Research/ArabicSystem/data/Split/source42"
+                   training_data43="/home/armatthe/Research/ArabicSystem/data/Split/source43"
+                   training_data44="/home/armatthe/Research/ArabicSystem/data/Split/source44"
+                   training_data45="/home/armatthe/Research/ArabicSystem/data/Split/source45"
+                   training_data46="/home/armatthe/Research/ArabicSystem/data/Split/source46"
+                   training_data47="/home/armatthe/Research/ArabicSystem/data/Split/source47"
+                   training_data48="/home/armatthe/Research/ArabicSystem/data/Split/source48"
+                   training_data49="/home/armatthe/Research/ArabicSystem/data/Split/source49"
+                   medar="/home/armatthe/translation-set/tok/medar"
+                   nist="/home/armatthe/translation-set/tok/nist"
+                   wiki="/home/armatthe/translation-set/tok/wiki")
+  testSetRefs=(PickTestSet:
+                 mt09="/home/armatthe/Research/ArabicSystem/data/mt09/target.txt"
+                 training_data00="/home/armatthe/Research/ArabicSystem/data/Split/target00"
+                 training_data01="/home/armatthe/Research/ArabicSystem/data/Split/target01"
+                 training_data02="/home/armatthe/Research/ArabicSystem/data/Split/target02"
+                 training_data03="/home/armatthe/Research/ArabicSystem/data/Split/target03"
+                 training_data04="/home/armatthe/Research/ArabicSystem/data/Split/target04"
+                 training_data05="/home/armatthe/Research/ArabicSystem/data/Split/target05"
+                 training_data06="/home/armatthe/Research/ArabicSystem/data/Split/target06"
+                 training_data07="/home/armatthe/Research/ArabicSystem/data/Split/target07"
+                 training_data08="/home/armatthe/Research/ArabicSystem/data/Split/target08"
+                 training_data09="/home/armatthe/Research/ArabicSystem/data/Split/target09"
+                 training_data10="/home/armatthe/Research/ArabicSystem/data/Split/target10"
+                 training_data11="/home/armatthe/Research/ArabicSystem/data/Split/target11"
+                 training_data12="/home/armatthe/Research/ArabicSystem/data/Split/target12"
+                 training_data13="/home/armatthe/Research/ArabicSystem/data/Split/target13"
+                 training_data14="/home/armatthe/Research/ArabicSystem/data/Split/target14"
+                 training_data15="/home/armatthe/Research/ArabicSystem/data/Split/target15"
+                 training_data16="/home/armatthe/Research/ArabicSystem/data/Split/target16"
+                 training_data17="/home/armatthe/Research/ArabicSystem/data/Split/target17"
+                 training_data18="/home/armatthe/Research/ArabicSystem/data/Split/target18"
+                 training_data19="/home/armatthe/Research/ArabicSystem/data/Split/target19"
+                 training_data20="/home/armatthe/Research/ArabicSystem/data/Split/target20"
+                 training_data21="/home/armatthe/Research/ArabicSystem/data/Split/target21"
+                 training_data22="/home/armatthe/Research/ArabicSystem/data/Split/target22"
+                 training_data23="/home/armatthe/Research/ArabicSystem/data/Split/target23"
+                 training_data24="/home/armatthe/Research/ArabicSystem/data/Split/target24"
+                 training_data25="/home/armatthe/Research/ArabicSystem/data/Split/target25"
+                 training_data26="/home/armatthe/Research/ArabicSystem/data/Split/target26"
+                 training_data27="/home/armatthe/Research/ArabicSystem/data/Split/target27"
+                 training_data28="/home/armatthe/Research/ArabicSystem/data/Split/target28"
+                 training_data29="/home/armatthe/Research/ArabicSystem/data/Split/target29"
+                 training_data30="/home/armatthe/Research/ArabicSystem/data/Split/target30"
+                 training_data31="/home/armatthe/Research/ArabicSystem/data/Split/target31"
+                 training_data32="/home/armatthe/Research/ArabicSystem/data/Split/target32"
+                 training_data33="/home/armatthe/Research/ArabicSystem/data/Split/target33"
+                 training_data34="/home/armatthe/Research/ArabicSystem/data/Split/target34"
+                 training_data35="/home/armatthe/Research/ArabicSystem/data/Split/target35"
+                 training_data36="/home/armatthe/Research/ArabicSystem/data/Split/target36"
+                 training_data37="/home/armatthe/Research/ArabicSystem/data/Split/target37"
+                 training_data38="/home/armatthe/Research/ArabicSystem/data/Split/target38"
+                 training_data39="/home/armatthe/Research/ArabicSystem/data/Split/target39"
+                 training_data40="/home/armatthe/Research/ArabicSystem/data/Split/target40"
+                 training_data41="/home/armatthe/Research/ArabicSystem/data/Split/target41"
+                 training_data42="/home/armatthe/Research/ArabicSystem/data/Split/target42"
+                 training_data43="/home/armatthe/Research/ArabicSystem/data/Split/target43"
+                 training_data44="/home/armatthe/Research/ArabicSystem/data/Split/target44"
+                 training_data45="/home/armatthe/Research/ArabicSystem/data/Split/target45"
+                 training_data46="/home/armatthe/Research/ArabicSystem/data/Split/target46"
+                 training_data47="/home/armatthe/Research/ArabicSystem/data/Split/target47"
+                 training_data48="/home/armatthe/Research/ArabicSystem/data/Split/target48"
+                 training_data49="/home/armatthe/Research/ArabicSystem/data/Split/target49"
+                 medar="/dev/null"
+                 nist="/dev/null"
+                 wiki="/dev/null"
+)
+
+  alignment="/home/armatthe/Research/ArabicSystem/data/alignment.txt"
+  languageModel="/home/mdenkows/oasis/en-ar/lm/GigaWord-200MW+Train-60MW.ar.bw.mada-3.1.red.TB.tok.klm"
+}
+
+global {
+  tuning_run_number=(TuningRun: 1 2 3)
+
+  decode_cores=32
+
+  meteor_lang="other"
+ 
+  moses="/home/armatthe/git/mosesdecoder"
+  multeval="/home/armatthe/git/timber/multeval/multeval.sh"
+
+  ttable_limit=20
+  reordering_model_type=msd-bidirectional-fe
+  distortion_limit=7
+  max_phrase_length=7
+  n_best_size=500
+}
+
+plan Behrang {
+   reach Decode via (TuneOrTest: test) * (TuningRun: 3) * (PickTestSet: medar nist wiki)
+}
+
+plan Full {
+   reach Evaluate via (TuneOrTest: test tune) * (TuningRun: 3) * (PickTestSet:
+  training_data00 training_data01 training_data02 training_data03 training_data04 training_data05 training_data06 training_data07 training_data08 training_data09
+  training_data10 training_data11 training_data12 training_data13 training_data14 training_data15 training_data16 training_data17 training_data18 training_data19
+  training_data20 training_data21 training_data22 training_data23 training_data24 training_data25 training_data26 training_data27 training_data28 training_data29
+  training_data30 training_data31 training_data32 training_data33 training_data34 training_data35 training_data36 training_data37 training_data38 training_data39
+  training_data40 training_data41 training_data42 training_data43 training_data44 training_data45 training_data46 training_data47 training_data48 training_data49)
+}

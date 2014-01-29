@@ -1,0 +1,30 @@
+global {
+    # Output directory:
+    ducttape_output="/usr2/home/austinma/Systems/hiin-enus-wmt14/ducttape"
+
+    train_corpus="/usr2/home/austinma/Systems/hiin-enus-wmt14/data/train.hien"
+    tune_corpus="/usr2/home/austinma/Systems/hiin-enus-wmt14/data/tune.hien"
+    test_corpus="/usr2/home/austinma/Systems/hiin-enus-wmt14/data/devtest.hien"
+
+    alignment="/dev/null"
+    lm_data="/usr2/home/austinma/Systems/hiin-enus-wmt14/data/mono.en"
+
+    language_model="/dev/null"
+}
+
+global {
+    tokenize_corpus="false"
+    lowercase_corpus="false"
+    lm_order=4
+    decode_cores=8
+
+    max_sentence_length=0
+    meteor_lang="other"
+
+    cdec_dir="/home/austinma/git/timber/cdec/"
+    multeval="/home/austinma/git/timber/multeval/multeval.sh"
+}
+
+plan Full {
+    reach Evaluate via (TuneOrTest: test tune) * (UseCustomAlignment: no) * (UseCustomLM: no) * (Optimizer: mira mert)
+}
