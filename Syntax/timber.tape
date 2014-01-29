@@ -550,7 +550,7 @@ task TuneWithMIRA
   #  --kbest-size 500 --update-size 500 --hope-select 1 --fear-select 1 --step-size 0.01 --metric-scale 1 --workdir $workDir --weights $initialWeights \
   #--source-file $wrappedSource --ref-files "$tuneRefs" $cdecIni
   paste $wrappedSource $tuneRefs | sed 's/\t/ ||| /g' > $wrappedCorpus
-  python ~/git/timber/cdec/training/mira/mira.py --kbest-size 500 -j $numCores -o $workDir -w $initialWeights -c $cdecIni -d $wrappedCorpus
+  python ~/git/timber/cdec/training/mira/mira.py --kbest-size 500 -j $numCores -o $workDir -c $cdecIni -d $wrappedCorpus --step-size 0.001 > mira_out.txt 2>mira_err.txt
 
   ln -s $workDir/weights.final $optimizedWeights
 }
