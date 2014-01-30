@@ -325,8 +325,12 @@ task ScoreLabelMatch
 }
 
 task ScoreLexProbs
-    < grammar=(UseNewFeatures: no=$scoredGrammar@ScoreRGL yes=$scoredGrammar@ScoreLabelMatch)
-    < inputScoreNames=(UseNewFeatures: no=$scoreNames@ScoreRGL yes=$scoreNames@ScoreLabelMatch)
+    < grammar=(UseNewFeatures:
+                 no=$scoredGrammar@ScoreRGL
+                 yes=$scoredGrammar@ScoreLabelMatch)
+    < inputScoreNames=(UseNewFeatures:
+                         no=$scoreNames@ScoreRGL
+                         yes=$scoreNames@ScoreLabelMatch)
     < lexE2F=$e2f@LexicalProbs
     < lexF2E=$f2e@LexicalProbs
     > scoredGrammar
@@ -394,7 +398,9 @@ task CreateGlueGrammar
 }
 
 task FindOOVs
-    < testSetSource=(TuneOrTest: test=$testSetSource tune=$tuneSetSource)  
+    < testSetSource=(TuneOrTest:
+                       test=$testSetSource
+                       tune=$tuneSetSource)  
     < scoredGrammar=@CollectRuleCounts
     > oovs
     :: scriptDir=@
@@ -403,7 +409,9 @@ task FindOOVs
 }
 
 task CreateSentenceGlueGrammars  
-    < testSetSourceTrees=(TuneOrTest: test=$testSetSourceTrees tune=$tuneSetSourceTrees)
+    < testSetSourceTrees=(TuneOrTest:
+                            test=$testSetSourceTrees
+                            tune=$tuneSetSourceTrees)
     < oovs=@FindOOVs
     < ntCounts=@CollectNonTerminalCounts
     > outputDir
@@ -416,7 +424,9 @@ task CreateSentenceGlueGrammars
 task FilterToTestSet
     < fullGrammar=$scoredGrammar@ScoreGlue
     < trainTargetTrees=$targetTrees
-    < source=(TuneOrTest: test=$testSetSource tune=$tuneSetSource)
+    < source=(TuneOrTest:
+                test=$testSetSource
+                tune=$tuneSetSource)
     < scoreNames=$scoreNames@ScoreGlue
     > filteredGrammarsDir
     :: numCores=$filteringCores
@@ -455,7 +465,9 @@ task MakeCdecIni
 }
 
 task Tune
-    < filteredGrammarsDir=$outputDir@CombineGrammars[TuneOrTest:tune]
+    < filteredGrammarsDir=(UseSyntheticOOVRules:
+                             yes=$outputDir@CombineGrammars[TuneOrTest:tune]
+                             no=$filteredGrammarsDir@FilterToTestSet[TuneOrTest:tune])
     < tuneSource=$tuneSetSource
     < tuneRefs=$tuneSetRefs
     < cdecIni=$cdecIni@MakeCdecIni
@@ -504,12 +516,16 @@ task Tune
 }
 
 task TuneWithMIRA
-    < filteredGrammarsDir=$outputDir@CombineGrammars[TuneOrTest:tune]
+    < filteredGrammarsDir=(UseSyntheticOOVRules:
+                             yes=$outputDir@CombineGrammars[TuneOrTest:tune]
+                             no=$filteredGrammarsDir@FilterToTestSet[TuneOrTest:tune])
     < tuneSource=$tuneSetSource
     < tuneRefs=$tuneSetRefs
     < cdecIni=@MakeCdecIni
     > optimizedWeights
-    :: useNewFeatures=(UseNewFeatures: no="1" yes="0")
+    :: useNewFeatures=(UseNewFeatures:
+                         no="1"
+                         yes="0")
     :: tuningRunNumber=@
     :: numCores=$decodeCores
     :: timberRoot=@
@@ -556,9 +572,16 @@ task TuneWithMIRA
 }
 
 task Decode
-    < testSource=(TuneOrTest: test=$testSetSource tune=$tuneSetSource)
-    < filteredGrammarsDir=$outputDir@CombineGrammars cdecIni=$cdecIni@MakeCdecIni
-    < optimizedWeights=(Optimizer: mert=$optimizedWeights@Tune mira=$optimizedWeights@TuneWithMIRA)
+    < testSource=(TuneOrTest:
+                    test=$testSetSource
+                    tune=$tuneSetSource)
+    < filteredGrammarsDir=(UseSyntheticOOVRules:
+                             yes=$outputDir@CombineGrammars
+                             no=$filteredGrammarsDir@FilterToTestSet)
+    < cdecIni=$cdecIni@MakeCdecIni
+    < optimizedWeights=(Optimizer:
+                          mert=$optimizedWeights@Tune
+                          mira=$optimizedWeights@TuneWithMIRA)
     > output
     :: numCores=$decodeCores
     :: timberRoot=@
@@ -573,7 +596,9 @@ task Decode
 
 task Evaluate
     < output=$output@Decode
-    < refs=(TuneOrTest: test=$testSetRefs tune=$tuneSetRefs)
+    < refs=(TuneOrTest:
+              test=$testSetRefs
+              tune=$tuneSetRefs)
     > bleu
     > meteor
     > ter
