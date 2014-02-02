@@ -130,6 +130,7 @@ global {
 
   decode_cores=32
 
+  meteor_task="li"
   meteor_lang="other"
  
   moses="/home/armatthe/git/mosesdecoder"
