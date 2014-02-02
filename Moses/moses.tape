@@ -43,8 +43,8 @@ task ExtractPhrases
   $moses/bin/extract $target $source $alignment phrase_instances $max_phrase_length orientation --GZOutput
 
   export LC_ALL=C
-  SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
-  #SORT="sort --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  #SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  SORT="sort --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
   zcat -f phrase_instances.gz | $SORT | gzip > phrase_instances.sorted.gz
   zcat -f phrase_instances.inv.gz | $SORT | gzip > phrase_instances.inv.sorted.gz
   zcat -f phrase_instances.o.gz | $SORT | gzip > phrase_orientations.sorted.gz
