@@ -3,6 +3,13 @@
 global {
   ducttape_experimental_submitters=enable
   ducttape_experimental_imports=enable
+  full_node_scheduler=torque_normal
+  partial_node_scheduler=torque_shared
+  tiny_task=2g
+  small_task=16g
+  medium_task=32g
+  big_task=60g
+  many_cpus=32
 }
 
 import ../submitters.tape
@@ -14,7 +21,7 @@ task AlignWithFastAlign
     > joint_corpus
     :: alignment_sym_heuristic=@
     :: cdec=@
-    :: .submitter=torque_shared .walltime="24:00:00" .cpus=1 .vmem=32g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="24:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   paste -d $'\t' $source $target | sed 's/\t/ ||| /' > $joint_corpus
   $cdec/word-aligner/fast_align -i $joint_corpus -d -v -o > fwd_align
   $cdec/word-aligner/fast_align -i $joint_corpus -d -v -o -r > rev_align
@@ -29,7 +36,7 @@ task AlignWithMeteor
     :: meteor_lang=@
     :: meteor_modules=@
     :: meteor_task=@
-    :: .submitter=torque_shared .walltime="24:00:00" .cpus=1 .vmem=32g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="24:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   meteor=$(dirname $multeval)/lib/meteor-*/
   java -Xmx2G -cp $meteor/meteor-*.jar Matcher $source $target -l $meteor_lang -m "$meteor_modules" -t $meteor_task | \
     python /home/armatthe/git/timber/timber_scripts/convert_meteor_alignment.py > $alignment
@@ -57,7 +64,7 @@ task AddPassthroughs
     > source
     > target
     > alignment
-    :: .submitter=torque_shared .walltime="01:00:00" .cpus=1 .vmem=2g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
   vocab="./vocab"
   cat $in_target | tr ' ' $'\n' | sort | uniq | sed '/^\s*$/d' > $vocab
   cat $in_source $vocab > $source
@@ -87,7 +94,7 @@ task LexicalProbs
     > lex_f2e=lex.f2e
     > lex_e2f=lex.e2f
     :: moses=@
-    :: .submitter=torque_shared .walltime="01:00:00" .cpus=1 .vmem=2g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
   $moses/scripts/training/get-lexical.perl $source $target $alignment lex
 }
 
@@ -96,7 +103,7 @@ task SynthesizePassthroughRules
     > phrase_instances
     > phrase_instances_inverse
     > phrase_orientations
-    :: .submitter=torque_shared .walltime="1:00:00" .cpus=1 .vmem=8g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="1:00:00" .cpus=1 .vmem=$small_task .q=shared {
     cat $target | tr ' ' $'\n' | sort | uniq | sed '/^\s*$/d' > vocab
     cat vocab | sed 's/\(.*\)/\1 ||| \1 ||| 0-0/' | gzip > $phrase_instances
     cat vocab | sed 's/\(.*\)/\1 ||| \1 ||| 0-0/' | gzip > $phrase_instances_inverse
@@ -121,7 +128,7 @@ task ExtractPhrases
     :: max_phrase_length=@
     :: cores=1
     :: moses=@
-    :: .submitter=torque_shared .walltime="12:00:00" .cpus=1 .vmem=8g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$small_task .q=shared {
   sort_buffer_size="1G"
   $moses/bin/extract $target $source $alignment phrase_instances $max_phrase_length orientation --GZOutput
 
@@ -156,7 +163,7 @@ task CombinePhrases
                                             yes=$phrase_instances_inverse@SynthesizePassthroughRules)
     > phrase_instances
     > phrase_instances_inverse
-    :: .submitter=torque_shared .walltime="12:00:00" .cpus=1 .vmem=16g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$small_task .q=shared {
   cores=1
   sort_buffer_size="1G"
   export LC_ALL=C
@@ -174,7 +181,7 @@ task ScorePhrases
     > scored_phrase_table=pt.gz
     :: cores=1
     :: moses=@
-    :: .submitter=torque_shared .walltime="12:00:00" .cpus=1 .vmem=16g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$small_task .q=shared {
   SCORE="$moses/bin/score"
   sort_buffer_size="1G"
 
@@ -273,7 +280,7 @@ task FilterPhraseTable
     > filtered_pt
     > filteredMosesIni=filtered_pt/moses.ini
     :: moses=@
-    :: .submitter=torque_shared .walltime="06:00:00" .cpus=1 .vmem=16g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$small_task .q=shared {
   perl $moses/scripts/training/filter-model-given-input.pl $filtered_pt $mosesIni $source
 }
 
@@ -285,7 +292,7 @@ task Tune
     :: cores=$decode_cores
     :: tuning_run_number=@
     :: moses=@
-    :: .submitter=torque_normal .walltime="24:00:00" .cpus=32 .vmem=60g .q=normal {
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
 
   i=0
   for ref_file in $refs; do
@@ -317,7 +324,7 @@ task Decode
     > output
     :: cores=$decode_cores
     :: moses=@
-    :: .submitter=torque_normal .walltime="4:00:00" .cpus=32 .vmem=60g .q=normal {
+    :: .submitter=$full_node_scheduler .walltime="4:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
   cat $src | $moses/bin/moses -f $mosesIni -threads $cores > $output
 }
 
@@ -329,7 +336,7 @@ task Evaluate
     > bleu meteor ter length
     :: multeval=@
     :: meteor_lang=@
-    :: .submitter=torque_shared .walltime="01:00:00" .cpus=1 .vmem=8g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$small_task .q=shared {
   METEORTASK=li
   METEORLANG=other #$meteor_lang
   scoreFile=scores.txt
