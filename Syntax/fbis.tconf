@@ -26,11 +26,15 @@ global {
    filteringCores=32
    grammarExtractionCores=32
    decodeCores=12
+   sortCores=32
+
    timberRoot="/home/armatthe/git/timber-branch"
    scriptDir="/home/armatthe/git/timber-branch/timber_scripts"
    tuningRunNumber=(TuningRunNumber: 1..3)
 
-   sortCores="32"
+   meteor_task="rank"
+   meteor_lang="en"
+
    sortRAM="20G"
    sortTempDir="."
 }
