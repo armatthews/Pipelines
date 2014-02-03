@@ -20,6 +20,8 @@ global {
   decode_cores=16
 
   max_sentence_length=0
+
+  meteor_task="li"
   meteor_lang="other"
 
   cdec_dir="/home/armatthe/git/timber/cdec/"
