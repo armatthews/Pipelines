@@ -83,7 +83,7 @@ task Symmetrize
     > alignment
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
-  $cdec_dir/utils/atools -i $s2tAlignment -j $t2sAlignment -c grow-diag-final-and > $alignment
+  $cdec_dir/utils/atools -i $s2tAlignment -j $t2sAlignment -c grow-diag > $alignment
 }
 
 # TODO: UseCustomAlignments: yes is broken if we do corpus filtering.
