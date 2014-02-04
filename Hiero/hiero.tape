@@ -178,7 +178,7 @@ task TuneWithMert
     > optimized_weights
     :: cores=$decode_cores
     :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="48:00:00" .cpus=32 .vmem=$big_task .q=normal {
+    :: .submitter=$partial_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
   initialWeights="./initialWeights.txt"
   echo 'CountEF 0.19419531547'            >> $initialWeights
   echo 'EgivenFCoherent -0.143753598764'  >> $initialWeights
