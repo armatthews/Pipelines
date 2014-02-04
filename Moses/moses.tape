@@ -66,7 +66,8 @@ task ScorePhrases
   sort_buffer_size="1G"
 
   export LC_ALL=C
-  SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  #SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  SORT="sort --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
 
   $SCORE $phrase_instances $lex_f2e /dev/stdout | gzip > pt.f2e.gz
   $SCORE $phrase_instances_inverse $lex_e2f /dev/stdout --Inverse | $SORT | gzip > pt.e2f.gz
