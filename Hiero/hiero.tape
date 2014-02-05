@@ -149,7 +149,7 @@ task MakeCdecIni
   # Moar features!!1
   echo "feature_function=NonLatinCount" >> $cdec_ini
   echo "feature_function=RuleShape" >> $cdec_ini
-  echo "feature_function=NgramFeatures -o 2 -c /mal0/cdyer/www/en-c600.gz" >> $cdec_ini
+  #echo "feature_function=NgramFeatures -o 2 -c /mal0/cdyer/www/en-c600.gz" >> $cdec_ini
   echo "feature_function=ArityPenalty" >> $cdec_ini
   echo "feature_function=SourcePathFeatures" >> $cdec_ini
 
