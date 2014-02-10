@@ -486,6 +486,7 @@ task MakeCdecIni
   echo "feature_function=WordPenalty" >> $cdecIni
   echo "add_pass_through_rules=true" >> $cdecIni
   echo "density_prune=100" >> $cdecIni
+  #echo "" >> $cdecIni
 }
 
 task Tune

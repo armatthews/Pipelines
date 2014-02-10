@@ -249,6 +249,6 @@ task Evaluate
 
 summary EvaluationSummary {
     of Evaluate > Score {
-      cp $meteor $Score
+      cp $bleu $Score
     }
 }
