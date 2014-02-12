@@ -36,21 +36,8 @@ task Lowercase
   fi
 }
 
-task FilterCorpus
-    < corpus=$lowercased_corpus@Lowercase[DataSection:train]
-    > filtered_corpus
-    :: max_sentence_length=@
-    :: cdec_dir=@
-    :: .submitter=shell .walltime="01:00:00" .cpus=1 .vmem=2g .q=shared {
-  if (( $max_sentence_length > 0 )); then
-    $cdec_dir/corpus/filter-length.pl $max_sentence_length $corpus > $filtered_corpus
-  else
-    cp $corpus $filtered_corpus
-  fi
-}
-
 task AlignS2T
-    < corpus=$filtered_corpus@FilterCorpus
+    < corpus=$lowercased_corpus@Lowercase[DataSection:train]
     > alignment
     :: cdec_dir=@
     :: .submitter=shell .walltime="12:00:00" .cpus=1 .vmem=32g .q=shared {
@@ -58,7 +45,7 @@ task AlignS2T
 }
 
 task AlignT2S
-    < corpus=$filtered_corpus@FilterCorpus
+    < corpus=$lowercased_corpus@Lowercase[DataSection:train]
     > alignment
     :: cdec_dir=@
     :: .submitter=shell .walltime="12:00:00" .cpus=1 .vmem=32g .q=shared {
@@ -74,14 +61,45 @@ task Symmetrize
   $cdec_dir/utils/atools -i $s2tAlignment -j $t2sAlignment -c grow-diag-final-and > $alignment
 }
 
+task AddSentenceBoundaryTags
+    < in_corpus=$lowercased_corpus@Lowercase
+    < in_alignment=(ExtractSection:
+                      train=(UseCustomAlignment:
+                               no=$alignment@Symmetrize
+                               yes=$alignment)
+                      tune="/dev/null"
+                      test="/dev/null")
+    > corpus
+    > alignment
+    :: use_sentence_boundaries=@
+    :: cdec_dir=@
+    :: .submitter=shell .walltime="1:00:00" .cpus=1 .vmem=1g .q=shared {
+  if [[ $use_sentence_boundaries == "false" ]]; then
+    cp $in_corpus $corpus
+    cp $in_alignment $alignment
+  else
+    if [[ $in_alignment != "/dev/null" ]]; then
+      ln -s $in_alignment ./temp_alignment
+    else
+      # add-sos-eos.pl requires alignment be non-blank, but it allows it to be just a space...
+      pv $in_corpus | sed 's/^.*$/ /' > ./temp_alignment
+    fi
+    paste $in_corpus ./temp_alignment | sed 's/\t/ ||| /g' | perl $cdec_dir/corpus/add-sos-eos.pl > ./out
+    pv ./out | sed 's/ ||| /\t/g' | cut -f -2 | sed 's/\t/ ||| /g' > $corpus
+    pv ./out | sed 's/ ||| /\t/g' | cut -f 3 > $alignment
+  fi
+}
+
 # TODO: UseCustomAlignments: yes is broken if we do corpus filtering.
 #       Avoid this by either setting UseCustomAlignments: no, or by
 #       setting max_sentence_length=0, which disables filtering.
 task BuildSuffixArray
-     < corpus=$filtered_corpus@FilterCorpus
+     < corpus=(UseSentenceBoundaries:
+                 no=$lowercased_corpus@Lowercase[DataSection:train]
+                 yes=$corpus@AddSentenceBoundaryTags[ExtractSection:train])
      < alignment=(UseCustomAlignment: 
                     no=$alignment@Symmetrize
-                    yes=$alignment)  
+                    yes=$alignment) 
      > ini
      > suffix_array
     :: cdec_dir=@
@@ -91,9 +109,9 @@ task BuildSuffixArray
 }
 
 task ExtractGrammars
-    < corpus=(ExtractSection:
-                tune=$lowercased_corpus@Lowercase[DataSection:tune]
-                test=$lowercased_corpus@Lowercase[DataSection:test])
+    < corpus=(UseSentenceBoundaries:
+                no=$lowercased_corpus@Lowercase
+                yes=$corpus@AddSentenceBoundaryTags)
     < ini=@BuildSuffixArray
     > wrapped_corpus
     > grammar_dir
@@ -105,7 +123,7 @@ task ExtractGrammars
 }
 
 task BuildLanguageModel
-    < corpus=$filtered_corpus@FilterCorpus
+    < corpus=$lowercased_corpus@Lowercase[DataSection:train]
     < lm_data=@
     > language_model
     :: lm_order=@
@@ -113,7 +131,8 @@ task BuildLanguageModel
     :: .submitter=shell .walltime="06:00:00" .cpus=1 .vmem=33g .q=shared {
   corpus_target="./corpus_target"
   $cdec_dir/corpus/cut-corpus.pl 2 $corpus > $corpus_target
-  cat $corpus_target $lm_data | $cdec_dir/klm/lm/builder/builder --order $lm_order -T /usr2/home/austinma/tmp/lm > $language_model
+  pv $lm_data >> $corpus_target
+  $cdec_dir/klm/lm/builder/builder --order $lm_order -T /usr2/home/austinma/tmp/lm --text $corpus_target --arpa $language_model
 }
 
 task CompileLanguageModel
@@ -128,22 +147,33 @@ task MakeCdecIni
     < language_model=(UseCustomLM:
                         no=$language_model@CompileLanguageModel
                         yes=$language_model)
-    > cdec_ini {
+    > cdec_ini
+    :: use_sentence_boundaries=(UseSentenceBoundaries: no="false" yes="true")
+    :: use_ngram_features=(UseNGramFeatures: yes="true" no="false")
+    :: use_source_path_features=(UseSourcePathFeatures: yes="true" no="false") {
   echo "formalism=scfg" > $cdec_ini
   echo "add_pass_through_rules=true" >> $cdec_ini
-  echo "feature_function=KLanguageModel $language_model" >> $cdec_ini
+  if [[ $use_sentence_boundaries ]]; then
+    echo "feature_function=KLanguageModel -x $language_model" >> $cdec_ini
+  else
+    echo "feature_function=KLanguageModel $language_model" >> $cdec_ini
+  fi
   echo "feature_function=WordPenalty" >> $cdec_ini
 
   # Moar features!!1
   echo "feature_function=NonLatinCount" >> $cdec_ini
   echo "feature_function=RuleShape" >> $cdec_ini
-  echo "feature_function=NgramFeatures -o 2 -c /mal0/cdyer/www/en-c600.gz" >> $cdec_ini
+  if [[ $use_ngram_features != "false" ]]; then
+    echo "feature_function=NgramFeatures -o 2 -c /mal0/cdyer/www/en-c600.gz" >> $cdec_ini
+  fi
   echo "feature_function=ArityPenalty" >> $cdec_ini
-  echo "feature_function=SourcePathFeatures" >> $cdec_ini
+  if [[ $use_source_path_features != "false" ]]; then
+    echo "feature_function=SourcePathFeatures" >> $cdec_ini # Chris says to be leery of these
+  fi
 
   # Slower, but better output, especially in syntactically divergent language pairs 
   echo "scfg_max_span_limit=18" >> $cdec_ini
-  echo "cubepruning_pop_limit=1200" >> $cdec_ini # Try 650 if 1200 is too slow
+  #echo "cubepruning_pop_limit=1200" >> $cdec_ini # Try 650 if 1200 is too slow
 }
 
 task Tune
