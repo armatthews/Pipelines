@@ -144,7 +144,7 @@ task BuildLanguageModel
   corpus_target="./corpus_target"
   $cdec_dir/corpus/cut-corpus.pl 2 $corpus > $corpus_target
   pv $lm_data >> $corpus_target
-  $cdec_dir/klm/lm/builder/builder --order $lm_order -T /usr2/home/austinma/tmp/lm --text $corpus_target --arpa $language_model
+  $cdec_dir/klm/lm/builder/builder --order $lm_order -T . --text $corpus_target --arpa $language_model
 }
 
 task CompileLanguageModel
@@ -160,6 +160,7 @@ task MakeCdecIni
                         no=$language_model@CompileLanguageModel
                         yes=$language_model)
     > cdec_ini
+    :: brown_cluster_map=@
     :: use_sentence_boundaries=(UseSentenceBoundaries: no="false" yes="true")
     :: use_ngram_features=(UseNGramFeatures: yes="true" no="false")
     :: use_source_path_features=(UseSourcePathFeatures: yes="true" no="false") {
@@ -176,7 +177,7 @@ task MakeCdecIni
   echo "feature_function=NonLatinCount" >> $cdec_ini
   echo "feature_function=RuleShape" >> $cdec_ini
   if [[ $use_ngram_features != "false" ]]; then
-    echo "feature_function=NgramFeatures -o 2 -c /mal0/cdyer/www/en-c600.gz" >> $cdec_ini
+    echo "feature_function=NgramFeatures -o 2 -c $brown_cluster_map" >> $cdec_ini
   fi
   echo "feature_function=ArityPenalty" >> $cdec_ini
   if [[ $use_source_path_features != "false" ]]; then

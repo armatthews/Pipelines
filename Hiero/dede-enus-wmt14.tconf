@@ -22,6 +22,7 @@ global {
                cleaner="/usr2/home/austinma/Systems/dede-enus-wmt14/data/extraclean/mono.en")
 
     language_model="/dev/null"
+    brown_cluster_map="/mal0/cdyer/www/en-c600.gz"
 }
 
 global {
