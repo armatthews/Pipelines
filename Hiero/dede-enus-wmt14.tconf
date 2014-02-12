@@ -11,7 +11,7 @@ global {
                              yes="/usr2/home/austinma/Systems/dede-enus-wmt14/data/tune.deen.pseudorefs")
                    cleaner=(UsePseudoRefs:
                               no="/usr2/home/austinma/Systems/dede-enus-wmt14/data/extraclean/tune.deen"
-                              yes="/usr2/home/austinma/Systems/dede-enus-wmt14/data/extraclean/tune.deen.pseudorefs")
+                              yes="/usr2/home/austinma/Systems/dede-enus-wmt14/data/extraclean/tune.deen.pseudorefs"))
     test_corpus=(Corpus:
                    crappy="/usr2/home/austinma/Systems/dede-enus-wmt14/data/devtest.deen"
                    cleaner="/usr2/home/austinma/Systems/dede-enus-wmt14/data/extraclean/devtest.deen")
@@ -42,7 +42,7 @@ global {
 }
 
 plan gwar {
-    reach Evaluate via (TuneOrTest: test tune) * (UseCustomAlignment: no) * (UseCustomLM: no) * (Optimizer: mira) * (UseSourcePathFeatures: yes) * (UseNGramFeatures: yes) * (UseSentenceBoundaries: no yes) * (Corpus: cleaner) * (UsePsuedoRefs: no yes)
+    reach Evaluate via (TuneOrTest: test tune) * (UseCustomAlignment: no) * (UseCustomLM: no) * (Optimizer: mira) * (UseSourcePathFeatures: yes) * (UseNGramFeatures: yes) * (UseSentenceBoundaries: no yes) * (Corpus: cleaner) * (UsePseudoRefs: no yes)
 }
 
 plan Full {
