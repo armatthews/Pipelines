@@ -2,12 +2,24 @@ global {
     # Output directory:
     ducttape_output="/usr2/home/austinma/Systems/dede-enus-wmt14/ducttape"
 
-    train_corpus="/usr2/home/austinma/Systems/dede-enus-wmt14/data/train.deen"
-    tune_corpus="/usr2/home/austinma/Systems/dede-enus-wmt14/data/tune.deen"
-    test_corpus="/usr2/home/austinma/Systems/dede-enus-wmt14/data/devtest.deen"
+    train_corpus=(Corpus:
+                    crappy="/usr2/home/austinma/Systems/dede-enus-wmt14/data/train.deen"
+                   cleaner="/usr2/home/austinma/Systems/dede-enus-wmt14/data/extraclean/train.deen")
+    tune_corpus=(Corpus:
+                   crappy=(UsePseudoRefs:
+                             no="/usr2/home/austinma/Systems/dede-enus-wmt14/data/tune.deen"
+                             yes="/usr2/home/austinma/Systems/dede-enus-wmt14/data/tune.deen.pseudorefs")
+                   cleaner=(UsePseudoRefs:
+                              no="/usr2/home/austinma/Systems/dede-enus-wmt14/data/extraclean/tune.deen"
+                              yes="/usr2/home/austinma/Systems/dede-enus-wmt14/data/extraclean/tune.deen.pseudorefs")
+    test_corpus=(Corpus:
+                   crappy="/usr2/home/austinma/Systems/dede-enus-wmt14/data/devtest.deen"
+                   cleaner="/usr2/home/austinma/Systems/dede-enus-wmt14/data/extraclean/devtest.deen")
 
     alignment="/dev/null"
-    lm_data="/usr2/home/austinma/Systems/dede-enus-wmt14/data/mono.en"
+    lm_data=(Corpus:
+               crappy="/usr2/home/austinma/Systems/dede-enus-wmt14/data/mono.en"
+               cleaner="/usr2/home/austinma/Systems/dede-enus-wmt14/data/extraclean/mono.en")
 
     language_model="/dev/null"
 }
@@ -15,6 +27,7 @@ global {
 global {
     tokenize_corpus="false"
     lowercase_corpus="false"
+    use_sentence_boundaries=(UseSentenceBoundaries: no="false" yes="true")
     lm_order=4
     decode_cores=8
 
@@ -25,6 +38,10 @@ global {
     multeval="/home/austinma/git/timber/multeval/multeval.sh"
 }
 
+plan gwar {
+    reach Evaluate via (TuneOrTest: test tune) * (UseCustomAlignment: no) * (UseCustomLM: no) * (Optimizer: mira) * (UseSourcePathFeatures: yes) * (UseNGramFeatures: yes) * (UseSentenceBoundaries: no yes) * (Corpus: cleaner) * (UsePsuedoRefs: no yes)
+}
+
 plan Full {
-    reach Evaluate via (TuneOrTest: test tune) * (UseCustomAlignment: no) * (UseCustomLM: no) * (Optimizer: mira mert)
+    reach Evaluate via (TuneOrTest: test tune) * (UseCustomAlignment: no) * (UseCustomLM: no) * (Optimizer: mira) * (UseSourcePathFeatures: yes no) * (UseNGramFeatures: yes no) * (UseSentenceBoundaries: no yes) * (Corpus: cleaner)
 }
