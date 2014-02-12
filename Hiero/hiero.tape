@@ -3,6 +3,18 @@
 global {
   ducttape_experimental_submitters=enable
   ducttape_experimental_imports=enable
+  full_node_scheduler=shell
+  #full_node_scheduler=torque_normal
+  partial_node_scheduler=shell
+  #partial_node_scheduler=torque_shared
+  tiny_task=2g
+  small_task=4g
+  medium_task=30g
+  #medium_task=32g
+  big_task=30g
+  #big_task=60g
+  many_cpus=8
+  #many_cpus=32
 }
 
 import ../submitters.tape
@@ -15,7 +27,7 @@ task Tokenize
     > tokenized_corpus
     :: tokenize_corpus=@
     :: cdec_dir=@
-    :: .submitter=shell .walltime="01:00:00" .cpus=1 .vmem=2g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
   if [[ $tokenize_corpus == "false" ]]; then
     cp $corpus $tokenized_corpus
   else
@@ -28,7 +40,7 @@ task Lowercase
     > lowercased_corpus
     :: lowercase_corpus=@
     :: cdec_dir=@
-    :: .submitter=shell .walltime="01:00:00" .cpus=1 .vmem=2g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
   if [[ $lowercase_corpus == "false" ]]; then
     cp $corpus $lowercased_corpus
   else
@@ -40,7 +52,7 @@ task AlignS2T
     < corpus=$lowercased_corpus@Lowercase[DataSection:train]
     > alignment
     :: cdec_dir=@
-    :: .submitter=shell .walltime="12:00:00" .cpus=1 .vmem=32g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   $cdec_dir/word-aligner/fast_align -i $corpus -d -v -o > $alignment
 }
 
@@ -48,7 +60,7 @@ task AlignT2S
     < corpus=$lowercased_corpus@Lowercase[DataSection:train]
     > alignment
     :: cdec_dir=@
-    :: .submitter=shell .walltime="12:00:00" .cpus=1 .vmem=32g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   $cdec_dir/word-aligner/fast_align -i $corpus -d -v -o -r > $alignment
 }
 
@@ -57,7 +69,7 @@ task Symmetrize
     < t2sAlignment=$alignment@AlignT2S
     > alignment
     :: cdec_dir=@
-    :: .submitter=shell .walltime="01:00:00" .cpus=1 .vmem=2g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
   $cdec_dir/utils/atools -i $s2tAlignment -j $t2sAlignment -c grow-diag-final-and > $alignment
 }
 
@@ -103,7 +115,7 @@ task BuildSuffixArray
      > ini
      > suffix_array
     :: cdec_dir=@
-    :: .submitter=shell .walltime="48:00:00" .cpus=1 .vmem=33g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="48:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   export PYTHONPATH=`echo $cdec_dir/python/build/lib.*`
   python -m cdec.sa.compile -b $corpus -a $alignment -c $ini -o $suffix_array
 }
@@ -117,7 +129,7 @@ task ExtractGrammars
     > grammar_dir
     :: cores=1
     :: cdec_dir=@
-    :: .submitter=shell .walltime="24:00:00" .cpus=1 .vmem=33g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="24:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   export PYTHONPATH=`echo $cdec_dir/python/build/lib.*`
   cat $corpus | python -m cdec.sa.extract -c $ini -g $grammar_dir -j $cores -z > $wrapped_corpus
 }
@@ -128,7 +140,7 @@ task BuildLanguageModel
     > language_model
     :: lm_order=@
     :: cdec_dir=@
-    :: .submitter=shell .walltime="06:00:00" .cpus=1 .vmem=33g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   corpus_target="./corpus_target"
   $cdec_dir/corpus/cut-corpus.pl 2 $corpus > $corpus_target
   pv $lm_data >> $corpus_target
@@ -139,7 +151,7 @@ task CompileLanguageModel
     < arpa=$language_model@BuildLanguageModel
     > language_model
     :: cdec_dir=@
-    :: .submitter=shell .walltime="06:00:00" .cpus=1 .vmem=33g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   $cdec_dir/klm/lm/build_binary $arpa $language_model
 }
 
@@ -183,7 +195,7 @@ task Tune
     > optimized_weights
     :: cores=$decode_cores
     :: cdec_dir=@
-    :: .submitter=shell .walltime="48:00:00" .cpus=32 .vmem=60g .q=normal {
+    :: .submitter=$partial_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
 
   python $cdec_dir/training/mira/mira.py --jobs $cores --kbest-size 500 -d $tune_set -o $mira_work -c $cdec_ini --step-size 0.001 >mira_out.txt 2>mira_err.txt
   ln -s $mira_work/weights.final $optimized_weights
@@ -196,7 +208,7 @@ task TuneWithMert
     > optimized_weights
     :: cores=$decode_cores
     :: cdec_dir=@
-    :: .submitter=shell .walltime="48:00:00" .cpus=32 .vmem=60g .q=normal {
+    :: .submitter=$partial_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
   initialWeights="./initialWeights.txt"
   echo 'CountEF 0.19419531547'            >> $initialWeights
   echo 'EgivenFCoherent -0.143753598764'  >> $initialWeights
@@ -236,7 +248,7 @@ task Decode
     :: k=1000
     :: cores=$decode_cores
     :: cdec_dir=@
-    :: .submitter=shell .walltime="6:00:00" .cpus=32 .vmem=60g .q=normal {
+    :: .submitter=$partial_node_scheduler .walltime="6:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
 
   cat $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > $kbest
   sed 's/ ||| /\t/g' $kbest | sort -u -k 1,1 -n | cut -f 2 > $output
@@ -247,9 +259,10 @@ task Evaluate
     < refs=(TuneOrTest: test=$test_corpus tune=$tune_corpus)
     > bleu meteor ter length
     :: multeval=@
+    :: meteor_task=@
     :: meteor_lang=@
-    :: .submitter=shell .walltime="00:20:00" .cpus=1 .vmem=4g .q=shared {
-  METEORTASK=li
+    :: .submitter=$partial_node_scheduler .walltime="00:20:00" .cpus=1 .vmem=$tiny_task .q=shared {
+  METEORTASK=$meteor_task
   METEORLANG=$meteor_lang
   scoreFile=scores.txt
 

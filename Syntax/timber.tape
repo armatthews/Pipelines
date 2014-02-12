@@ -2,6 +2,18 @@
 global {
     ducttape_experimental_submitters=enable
     ducttape_experimental_imports=enable
+    full_node_scheduler=shell
+    #full_node_scheduler=torque_normal
+    partial_node_scheduler=shell
+    #partial_node_scheduler=torque_shared
+    tiny_task=2g
+    small_task=4g
+    medium_task=30g
+    #medium_task=40g
+    big_task=30g
+    #big_task=60g
+    many_cpus=8
+    #many_cpus=32
 }
 
 import ../submitters.tape
@@ -15,7 +27,7 @@ task LexicalProbs
     > e2f
     > f2e
     :: scriptDir=@
-    :: .submitter=torque_shared .walltime="01:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$medium_task {
   perl $scriptDir/lex.perl --f $source --e $target --a $alignment --f2e $f2e --e2f $e2f
 }
 
@@ -27,7 +39,7 @@ task GrammarExtraction
     > aligns
     :: numCores=$grammarExtractionCores
     :: timberRoot=@
-    :: .submitter=torque_normal .walltime="01:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="01:00:00" {
   # Prepare to split the input files into chunks, one per core 
   tempDir=$(mktemp -d -p .)
   inputLineCount=$(cat $sourceTrees | wc -l)
@@ -57,7 +69,7 @@ task CollectNonTerminalCounts
     < rules=@GrammarExtraction
     > ntCounts
     :: scriptDir=@
-    :: .submitter=torque_shared .walltime="01:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$medium_task {
   cat $rules | perl $scriptDir/collect-nt-pair-counts.pl > $ntCounts
 }
 
@@ -66,7 +78,7 @@ task ConvertGrammarFormat
     > grammar
     > scoreNames
     :: scriptDir=@
-    :: .submitter=torque_shared .walltime="01:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$medium_task {
   pv $rules | python $scriptDir/convert_grammar_format.py -j > $grammar
   echo 'count' > $scoreNames
 }
@@ -83,10 +95,11 @@ task CollectRuleCounts
     :: sortCores=@
     :: sortRAM=@
     :: sortTempDir=@
-    :: .submitter=torque_normal .walltime="24:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   touch $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 1,4 --parallel=$sortCores > $sortedGrammar
+  #pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 1,4 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 1,4 > $sortedGrammar
   pv $sortedGrammar | python $scriptDir/collect_rule_counts.py $inputScoreNames $scoreNames > $scoredGrammar
   rm $sortedGrammar
 }
@@ -101,10 +114,11 @@ task ScorePhrasalSGT
     :: sortCores=@
     :: sortRAM=@
     :: sortTempDir=@
-    :: .submitter=torque_normal .walltime="24:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   cp $inputScoreNames $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 4,4 --parallel=$sortCores > $sortedGrammar
+  #pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 4,4 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 4,4 > $sortedGrammar
   pv $sortedGrammar | perl $timberRoot/grascore/score-phrase-sgt.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
   rm $sortedGrammar
@@ -119,10 +133,11 @@ task ScorePhrasalTGS
     :: sortCores=@
     :: sortRAM=@
     :: sortTempDir=@
-    :: .submitter=torque_normal .walltime="24:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   cp $inputScoreNames $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,3 --parallel=$sortCores > $sortedGrammar
+  #pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,3 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,3 > $sortedGrammar
   pv $sortedGrammar | perl $timberRoot/grascore/score-phrase-tgs.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
   rm $sortedGrammar
@@ -137,10 +152,11 @@ task ScoreLGR
     :: sortCores=@
     :: sortRAM=@
     :: sortTempDir=@
-    :: .submitter=torque_normal .walltime="24:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   cp $inputScoreNames $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,4 --parallel=$sortCores > $sortedGrammar
+  #pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,4 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,4 > $sortedGrammar
   pv $sortedGrammar | perl $timberRoot/grascore/score-lhs-given-rhs.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
   rm $sortedGrammar
@@ -155,10 +171,11 @@ task ScoreRGL
     :: sortCores=@
     :: sortRAM=@
     :: sortTempDir=@
-    :: .submitter=torque_normal .walltime="24:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   cp $inputScoreNames $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 2,2 --parallel=$sortCores > $sortedGrammar
+  #pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 2,2 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 2,2 > $sortedGrammar
   pv $sortedGrammar | perl $timberRoot/grascore/score-rhs-given-lhs.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
   rm $sortedGrammar
@@ -170,7 +187,7 @@ task WidenGrammarFormat
     > scoredGrammar
     > scoreNames
     :: timberRoot=@
-    :: .submitter=torque_shared .walltime="04:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="04:00:00" .cpus=1 .vmem=$medium_task {
   pv $grammar | perl $timberRoot/grascore/widen-format.pl > $scoredGrammar
   pv $inputScoreNames > $scoreNames
 }
@@ -184,10 +201,11 @@ task ScoreSourceLGR
     :: sortCores=@
     :: sortRAM=@
     :: sortTempDir=@
-    :: .submitter=torque_normal .walltime="24:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   cp $inputScoreNames $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 4,4 --parallel=$sortCores > $sortedGrammar
+  #pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 4,4 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 4,4 > $sortedGrammar
   pv $sortedGrammar | perl $timberRoot/grascore/score-wide-slhs-given-srhs.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
   rm $sortedGrammar
@@ -202,10 +220,11 @@ task ScoreTargetLGR
     :: sortCores=@
     :: sortRAM=@
     :: sortTempDir=@
-    :: .submitter=torque_normal .walltime="24:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   cp $inputScoreNames $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 5,5 --parallel=$sortCores > $sortedGrammar
+  #pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 5,5 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 5,5 > $sortedGrammar
   pv $sortedGrammar | perl $timberRoot/grascore/score-wide-tlhs-given-trhs.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
   rm $sortedGrammar
@@ -220,10 +239,11 @@ task ScoreSourceRGL
     :: sortCores=@
     :: sortRAM=@
     :: sortTempDir=@
-    :: .submitter=torque_normal .walltime="24:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   cp $inputScoreNames $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 2,2 --parallel=$sortCores > $sortedGrammar
+  #pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 2,2 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 2,2 > $sortedGrammar
   pv $sortedGrammar | perl $timberRoot/grascore/score-wide-srhs-given-slhs.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
   rm $sortedGrammar
@@ -238,10 +258,11 @@ task ScoreTargetRGL
     :: sortCores=@
     :: sortRAM=@
     :: sortTempDir=@
-    :: .submitter=torque_normal .walltime="24:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   cp $inputScoreNames $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,3 --parallel=$sortCores > $sortedGrammar
+  #pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,3 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,3 > $sortedGrammar
   pv $sortedGrammar | perl $timberRoot/grascore/score-wide-trhs-given-tlhs.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
   rm $sortedGrammar
@@ -256,10 +277,11 @@ task ScoreRuleSGT
     :: sortCores=@
     :: sortRAM=@
     :: sortTempDir=@
-    :: .submitter=torque_normal .walltime="24:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   cp $inputScoreNames $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,3 -k 5,5 --parallel=$sortCores > $sortedGrammar
+  #pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,3 -k 5,5 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,3 -k 5,5 > $sortedGrammar
   pv $sortedGrammar | perl $timberRoot/grascore/score-wide-cfg-sgt.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
   rm $sortedGrammar
@@ -274,10 +296,11 @@ task ScoreRuleTGS
     :: sortCores=@
     :: sortRAM=@
     :: sortTempDir=@
-    :: .submitter=torque_normal .walltime="24:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   cp $inputScoreNames $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 2,2 -k 4,4 --parallel=$sortCores > $sortedGrammar
+  #pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 2,2 -k 4,4 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 2,2 -k 4,4 > $sortedGrammar
   pv $sortedGrammar | perl $timberRoot/grascore/score-wide-cfg-tgs.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
   rm $sortedGrammar
@@ -289,7 +312,7 @@ task NarrowGrammarFormat
     > scoredGrammar
     > scoreNames
     :: timberRoot=@
-    :: .submitter=torque_shared .walltime="04:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="04:00:00" .cpus=1 .vmem=$medium_task {
   pv $grammar | perl $timberRoot/grascore/narrow-format.pl > $scoredGrammar
   pv $inputScoreNames > $scoreNames
 }
@@ -304,8 +327,9 @@ task ResortForConvenience
     :: sortCores=@
     :: sortRAM=@
     :: sortTempDir=@ 
-    :: .submitter=torque_normal .walltime="24:00:00" {
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,4 --parallel=$sortCores > $scoredGrammar
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" {
+  #pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,4 --parallel=$sortCores > $scoredGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,4 > $scoredGrammar
   pv $inputScoreNames > $scoreNames
 }
 
@@ -317,7 +341,7 @@ task ScoreLabelMatch
     > scoredGrammar
     > scoreNames
     :: timberRoot=@
-    :: .submitter=torque_shared .walltime="04:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="04:00:00" .cpus=1 .vmem=$medium_task {
   cp $inputScoreNames $scoreNames
   pv $grammar | perl $timberRoot/grascore/get-nt-pair-counts.pl tab $scoreNames > ./pairCountsOut
   pv $grammar | perl $timberRoot/grascore/add-label-match-probs.pl ./pairCountsOut $scoreNames > $scoredGrammar
@@ -336,7 +360,7 @@ task ScoreLexProbs
     > scoredGrammar
     > scoreNames
     :: timberRoot=@
-    :: .submitter=torque_shared .walltime="04:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="04:00:00" .cpus=1 .vmem=$medium_task {
   cp $inputScoreNames $scoreNames
   pv $grammar | perl $timberRoot/grascore/add-lex-probs-jon.pl $lexE2F $lexF2E $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
@@ -348,7 +372,7 @@ task ScoreRarity
     > scoredGrammar
     > scoreNames
     :: timberRoot=@
-    :: .submitter=torque_shared .walltime="04:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="04:00:00" .cpus=1 .vmem=$medium_task {
   cp $inputScoreNames $scoreNames
   pv $grammar | perl $timberRoot/grascore/add-rarity-score.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
@@ -360,7 +384,7 @@ task ScoreFullyAbstract
     > scoredGrammar
     > scoreNames
     :: timberRoot=@
-    :: .submitter=torque_shared .walltime="04:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="04:00:00" .cpus=1 .vmem=$medium_task {
   cp $inputScoreNames $scoreNames
   pv $grammar | perl $timberRoot/grascore/add-fully-abs-bin.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
@@ -372,7 +396,7 @@ task ScoreFullyLexical
     > scoredGrammar
     > scoreNames
     :: timberRoot=@
-    :: .submitter=torque_shared .walltime="04:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="04:00:00" .cpus=1 .vmem=$medium_task {
   cp $inputScoreNames $scoreNames
   pv $grammar | perl $timberRoot/grascore/add-fully-lex-bin.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
@@ -384,7 +408,7 @@ task ScoreGlue
     > scoredGrammar
     > scoreNames
     :: timberRoot=@
-    :: .submitter=torque_shared .walltime="04:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="04:00:00" .cpus=1 .vmem=$medium_task {
   cp $grammar $scoredGrammar
   cat $inputScoreNames | sed 's/$/ glue?/' > $scoreNames
 }
@@ -393,7 +417,7 @@ task CreateGlueGrammar
     < grammar=$scoredGrammar@ScoreGlue
     > glueGrammar
     :: scriptDir=@
-    :: .submitter=torque_shared .walltime="04:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="04:00:00" .cpus=1 .vmem=$medium_task {
   cat $grammar | cut -f 2 | python $scriptDir/create_glue_grammar.py > $glueGrammar
 }
 
@@ -404,7 +428,7 @@ task FindOOVs
     < scoredGrammar=@CollectRuleCounts
     > oovs
     :: scriptDir=@
-    :: .submitter=torque_shared .walltime="01:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$medium_task {
   python $scriptDir/findOOVs.py $scoredGrammar $testSetSource > $oovs
 }
 
@@ -416,7 +440,7 @@ task CreateSentenceGlueGrammars
     < ntCounts=@CollectNonTerminalCounts
     > outputDir
     :: scriptDir=@
-    :: .submitter=torque_shared .walltime="01:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$medium_task {
   mkdir $outputDir
   pv $testSetSourceTrees | python $scriptDir/extract_glue_rules.py $oovs $ntCounts $outputDir  
 }
@@ -432,7 +456,7 @@ task FilterToTestSet
     :: numCores=$filteringCores
     :: timberRoot=@
     :: scriptDir=@
-    :: .submitter=torque_normal .walltime="72:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="72:00:00" {
   cp $scoreNames ./scoreNames
   bash $scriptDir/filtering.sh $fullGrammar $source $trainTargetTrees ./scoreNames $numCores $filteredGrammarsDir 0.3776
 }
@@ -441,7 +465,7 @@ task CombineGrammars
     < filteredGrammarsDir=@FilterToTestSet
     < glueGrammarDir=$outputDir@CreateSentenceGlueGrammars
     > outputDir
-    :: .submitter=torque_shared .walltime="01:00:00" .cpus=1 .vmem=40g {
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$medium_task {
   mkdir $outputDir
   for f in `ls -1 $filteredGrammarsDir`;
   do
@@ -462,6 +486,7 @@ task MakeCdecIni
   echo "feature_function=WordPenalty" >> $cdecIni
   echo "add_pass_through_rules=true" >> $cdecIni
   echo "density_prune=100" >> $cdecIni
+  #echo "" >> $cdecIni
 }
 
 task Tune
@@ -477,7 +502,7 @@ task Tune
     :: numCores=$decodeCores
     :: timberRoot=@
     :: scriptDir=@
-    :: .submitter=torque_normal .walltime="72:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="72:00:00" {
   initialWeights="initialWeights.txt"
   wrappedDevSet="wrappedDevSet.txt"
   workDir="./mert-work"
@@ -530,7 +555,7 @@ task TuneWithMIRA
     :: numCores=$decodeCores
     :: timberRoot=@
     :: scriptDir=@
-    :: .submitter=torque_normal .walltime="72:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="72:00:00" {
   initialWeights="initialWeights.txt"
   wrappedSource="wrappedSource.txt"
   wrappedCorpus="wrappedCorpus.txt"
@@ -586,7 +611,7 @@ task Decode
     :: numCores=$decodeCores
     :: timberRoot=@
     :: scriptDir=@
-    :: .submitter=torque_normal .walltime="72:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="72:00:00" {
   wrappedSource="wrappedSource.txt" 
   cat $testSource | python $scriptDir/wrapCorpus.py $filteredGrammarsDir > $wrappedSource
   date > timestamps.txt
@@ -604,9 +629,11 @@ task Evaluate
     > ter
     > length
     :: timberRoot=@
-    :: .submitter=torque_shared .walltime="01:00:00" .cpus=1 .vmem=40g {
-  METEORTASK=li
-  METEORLANG=other
+    :: meteor_task=@
+    :: meteor_lang=@
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$medium_task {
+  METEORTASK=$meteor_task
+  METEORLANG=$meteor_lang
   scoreFile=scores.txt
   ln -s $timberRoot/multeval/constants .
   $timberRoot/multeval/multeval.sh eval --refs $refs --hyps-baseline $output --meteor.task $METEORTASK --meteor.language $METEORLANG &> $scoreFile

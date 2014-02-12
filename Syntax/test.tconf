@@ -19,10 +19,19 @@ global {
 
    # Parameters:
    languageModel="/oasis/projects/nsf/cmu126/ghannema/lms/c2e.3gram.trie"
+
    numCores=1
+   filteringCores=32
+   grammarExtractionCores=32
+   decodeCores=12
+   sortCores=32
+
    timberRoot="/home/armatthe/git/timber-branch"
    scriptDir="/home/armatthe/git/timber-branch/timber_scripts"
    tuningRunNumber=(TuningRunNumber: 1..3)
+
+   meteor_task="rank"
+   meteor_lang="en"
 
    sortRAM="20G"
    sortTempDir="."

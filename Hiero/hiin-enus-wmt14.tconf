@@ -19,7 +19,9 @@ global {
     decode_cores=8
 
     max_sentence_length=0
-    meteor_lang="other"
+
+    meteor_task="rank"
+    meteor_lang="en"
 
     cdec_dir="/home/austinma/git/timber/cdec/"
     multeval="/home/austinma/git/timber/multeval/multeval.sh"

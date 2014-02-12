@@ -3,6 +3,16 @@
 global {
   ducttape_experimental_submitters=enable
   ducttape_experimental_imports=enable
+  full_node_scheduler=shell
+  #full_node_scheduler=torque_normal
+  partial_node_scheduler=shell
+  #partial_node_scheduler=torque_shared
+  tiny_task=2g
+  small_task=8g
+  medium_task=16g
+  big_task=30g
+  many_cpus=8
+  #many_cpus=32
 }
 
 import ../submitters.tape
@@ -14,7 +24,7 @@ task LexicalProbs
     > lex_f2e=lex.f2e
     > lex_e2f=lex.e2f
     :: moses=@
-    :: .submitter=torque_shared .walltime="01:00:00" .cpus=1 .vmem=2g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
   $moses/scripts/training/get-lexical.perl $source $target $alignment lex
 }
 
@@ -28,12 +38,13 @@ task ExtractPhrases
     :: max_phrase_length=@
     :: cores=1
     :: moses=@
-    :: .submitter=torque_shared .walltime="12:00:00" .cpus=1 .vmem=8g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$small_task .q=shared {
   sort_buffer_size="1G"
   $moses/bin/extract $target $source $alignment phrase_instances $max_phrase_length orientation --GZOutput
 
   export LC_ALL=C
-  SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  #SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  SORT="sort --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
   zcat -f phrase_instances.gz | $SORT | gzip > phrase_instances.sorted.gz
   zcat -f phrase_instances.inv.gz | $SORT | gzip > phrase_instances.inv.sorted.gz
   zcat -f phrase_instances.o.gz | $SORT | gzip > phrase_orientations.sorted.gz
@@ -50,12 +61,13 @@ task ScorePhrases
     > scored_phrase_table=pt.gz
     :: cores=1 
     :: moses=@
-    :: .submitter=torque_shared .walltime="06:00:00" .cpus=1 .vmem=2g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
   SCORE="$moses/bin/score"
   sort_buffer_size="1G"
 
   export LC_ALL=C
-  SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  #SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  SORT="sort --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
 
   $SCORE $phrase_instances $lex_f2e /dev/stdout | gzip > pt.f2e.gz
   $SCORE $phrase_instances_inverse $lex_e2f /dev/stdout --Inverse | $SORT | gzip > pt.e2f.gz
@@ -144,7 +156,7 @@ task FilterPhraseTable
     > filtered_pt
     > filteredMosesIni=filtered_pt/moses.ini
     :: moses=@
-    :: .submitter=torque_shared .walltime="06:00:00" .cpus=1 .vmem=16g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
    perl $moses/scripts/training/filter-model-given-input.pl $filtered_pt $mosesIni $source
 }
 
@@ -153,7 +165,7 @@ task BuildReorderingModel
     > reordering_table=reordering_table.gz
     :: reordering_model_type=@
     :: moses=@
-    :: .submitter=torque_shared .walltime="06:00:00" .cpus=1 .vmem=2g .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
   smooth=0.5
   type=wbe
   orientation=msd
@@ -170,7 +182,7 @@ task Tune
     :: cores=$decode_cores
     :: tuning_run_number=@
     :: moses=@
-    :: .submitter=torque_normal .walltime="24:00:00" .cpus=32 .vmem=60g .q=normal { 
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal { 
 
   i=0
   for ref_file in $refs; do
@@ -209,7 +221,7 @@ task Decode
     > output
     :: cores=$decode_cores
     :: moses=@
-    :: .submitter=torque_normal .walltime="100:00:00" .cpus=32 .vmem=60g .q=normal {
+    :: .submitter=$full_node_scheduler .walltime="100:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
   cat $src | $moses/bin/moses -f $mosesIni -threads $cores > $output
 }
 
@@ -220,9 +232,10 @@ task Evaluate
       tune=$tuneSetRefs)
     > bleu meteor ter length
     :: multeval=@
+    :: meteor_task=@
     :: meteor_lang=@
-    :: .submitter=torque_shared .walltime="01:00:00" .cpus=1 .vmem=8g .q=shared {
-  METEORTASK=li
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$small_task .q=shared {
+  METEORTASK=$meteor_task
   METEORLANG=$meteor_lang
   scoreFile=scores.txt
 
@@ -236,6 +249,6 @@ task Evaluate
 
 summary EvaluationSummary {
     of Evaluate > Score {
-      cp $meteor $Score
+      cp $bleu $Score
     }
 }
