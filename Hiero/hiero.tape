@@ -86,20 +86,11 @@ task AddSentenceBoundaryTags
     :: use_sentence_boundaries=@
     :: cdec_dir=@
     :: .submitter=shell .walltime="1:00:00" .cpus=1 .vmem=1g .q=shared {
-  if [[ $use_sentence_boundaries == "false" ]]; then
-    cp $in_corpus $corpus
-    cp $in_alignment $alignment
-  else
-    if [[ $in_alignment != "/dev/null" ]]; then
-      ln -s $in_alignment ./temp_alignment
-    else
-      # add-sos-eos.pl requires alignment be non-blank, but it allows it to be just a space...
-      pv $in_corpus | sed 's/^.*$/ /' > ./temp_alignment
-    fi
-    paste $in_corpus ./temp_alignment | sed 's/\t/ ||| /g' | perl $cdec_dir/corpus/add-sos-eos.pl > ./out
-    pv ./out | sed 's/ ||| /\t/g' | cut -f -2 | sed 's/\t/ ||| /g' > $corpus
-    pv ./out | sed 's/ ||| /\t/g' | cut -f 3 > $alignment
+  if [[ $in_alignment == "/dev/null" ]]; then
+    pv $in_corpus | sed 's/^.*$//' > ./fake_in_alignment
+    in_alignment=./fake_in_alignment
   fi
+  perl $cdec_dir/corpus/add-sos-eos.pl $in_corpus $in_alignment $alignment > $corpus
 }
 
 # TODO: UseCustomAlignments: yes is broken if we do corpus filtering.
@@ -109,9 +100,11 @@ task BuildSuffixArray
      < corpus=(UseSentenceBoundaries:
                  no=$lowercased_corpus@Lowercase[DataSection:train]
                  yes=$corpus@AddSentenceBoundaryTags[ExtractSection:train])
-     < alignment=(UseCustomAlignment: 
-                    no=$alignment@Symmetrize
-                    yes=$alignment) 
+     < alignment=(UseSentenceBoundaries:
+                    no=(UseCustomAlignment: 
+                          no=$alignment@Symmetrize
+                          yes=$alignment)
+                    yes=$alignment@AddSentenceBoundaryTags)
      > ini
      > suffix_array
     :: cdec_dir=@
