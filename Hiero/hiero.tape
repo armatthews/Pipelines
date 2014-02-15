@@ -59,10 +59,10 @@ task AddSentenceBoundaryTags
     :: cdec_dir=@
     :: .submitter=shell .walltime="1:00:00" .cpus=1 .vmem=1g .q=shared {
   if [[ $in_alignment == "/dev/null" ]]; then
-    pv $in_corpus | sed 's/^.*$//' > ./fake_in_alignment
-    in_alignment=./fake_in_alignment
+    perl $cdec_dir/corpus/add-sos-eos.pl $in_corpus > $corpus
+  else
+    perl $cdec_dir/corpus/add-sos-eos.pl $in_corpus $in_alignment $alignment > $corpus
   fi
-  perl $cdec_dir/corpus/add-sos-eos.pl $in_corpus $in_alignment $alignment > $corpus
 }
 
 task BuildSuffixArray
@@ -71,7 +71,7 @@ task BuildSuffixArray
                  yes=$corpus@AddSentenceBoundaryTags[DataSection:train])
      < alignment=(UseSentenceBoundaries:
                     no=$alignment@Symmetrize
-                    yes=$alignment@AddSentenceBoundaryTags)
+                    yes=$alignment@AddSentenceBoundaryTags[DataSection:train])
      > ini
      > suffix_array
     :: cdec_dir=@
@@ -97,17 +97,60 @@ task ExtractGrammars
   cat $corpus | python -m cdec.sa.extract -c $ini -g $grammar_dir -j $cores -z > $wrapped_corpus
 }
 
+task TagPassthroughs
+    < test_set=(DataSection:
+                  train=$train_corpus
+                  tune=$tune_corpus
+                  test=$test_corpus)
+    > bio_tags
+    :: magic="Something Swabha gives me? lol"
+    :: script_dir=@
+    :: cdec_dir=@
+    :: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+  pv $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | python $script_dir/tag_passthroughs.py > $bio_tags
+}
+
+task MakeGlueGrammars
+    < test_set=(DataSection:
+                  train=$train_corpus
+                  tune=$tune_corpus
+                  test=$test_corpus)
+    < bio_tags=@TagPassthroughs
+    > grammar_dir
+    :: script_dir=@
+    :: cdec_dir=@
+    :: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+  mkdir -p $grammar_dir
+  script_location="/usr0/home/cdyer/wmt14/make-self-translations.pl"
+  $cdec_dir/corpus/paste-files.pl paste <(perl $cdec_dir/corpus/cut-corpus.pl 1 $test_set) $bio_tags | \
+    perl $script_dir/make-self-translations.pl $grammar_dir
+}
+
+task LMBrownClusters
+    < lm_data=@
+    < cluster_map=@
+    > out
+    :: script_dir=@
+    :: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=2 .vmem=$medium_task .q=shared {
+  zcat -f $lm_data | python $script_dir/map_clusters.py $cluster_map | gzip > out
+}    
+
 task BuildLanguageModel
     < corpus=$train_corpus
-    < lm_data=@
+    < lm_data=(LMType:
+                 surface=$lm_data
+                 brown=$out@LMBrownClusters)
     > language_model
-    :: lm_order=@
+    :: lm_order=(LMType:
+                   surface=$lm_order
+                   brown=$brown_lm_order)
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   corpus_target="./corpus_target"
   $cdec_dir/corpus/cut-corpus.pl 2 $corpus > $corpus_target
-  pv $lm_data >> $corpus_target
-  $cdec_dir/klm/lm/builder/builder --order $lm_order -T . --text $corpus_target --arpa $language_model
+  zcat -f $lm_data >> $corpus_target
+  $cdec_dir/klm/lm/builder/lmplz --order $lm_order -T . --text $corpus_target --arpa $language_model
+  rm $corpus_target
 }
 
 task CompileLanguageModel
@@ -121,33 +164,36 @@ task CompileLanguageModel
 task MakeCdecIni
     < language_model=$language_model@CompileLanguageModel
     > cdec_ini
-    :: brown_cluster_map=@
-    :: use_sentence_boundaries=(UseSentenceBoundaries: no="false" yes="true")
-    :: use_ngram_features=(UseNGramFeatures: yes="true" no="false")
-    :: use_source_path_features=(UseSourcePathFeatures: yes="true" no="false") {
+    :: cluster_map=@
+    :: use_sentence_boundaries_flag=(UseSentenceBoundaries:
+                                       no=""
+                                       yes="-x ")
+    :: use_ngram_features=(UseNGramFeatures:
+                             yes="true"
+                             no="false")
+    :: use_source_path_features=(UseSourcePathFeatures:
+                                   yes="true"
+                                   no="false")
+    :: scfg_max_span_limit=@ 
+    :: cubepruning_pop_limit=@ {
   echo "formalism=scfg" > $cdec_ini
-  echo "add_pass_through_rules=true" >> $cdec_ini
-  if [[ $use_sentence_boundaries ]]; then
-    echo "feature_function=KLanguageModel -x $language_model" >> $cdec_ini
-  else
-    echo "feature_function=KLanguageModel $language_model" >> $cdec_ini
-  fi
+  echo "add_pass_through_rules=true" >> $cdec_ini 
+  echo "feature_function=KLanguageModel $use_sentence_boundaries_flag $language_model" >> $cdec_ini
   echo "feature_function=WordPenalty" >> $cdec_ini
 
   # Moar features!!1
   echo "feature_function=NonLatinCount" >> $cdec_ini
   echo "feature_function=RuleShape" >> $cdec_ini
-  if [[ $use_ngram_features != "false" ]]; then
-    echo "feature_function=NgramFeatures -o 2 -c $brown_cluster_map" >> $cdec_ini
-  fi
   echo "feature_function=ArityPenalty" >> $cdec_ini
+  if [[ $use_ngram_features != "false" ]]; then
+    echo "feature_function=NgramFeatures -o 2 -c $cluster_map" >> $cdec_ini
+  fi
   if [[ $use_source_path_features != "false" ]]; then
     echo "feature_function=SourcePathFeatures" >> $cdec_ini # Chris says to be leery of these
   fi
 
-  # Slower, but better output, especially in syntactically divergent language pairs 
-  echo "scfg_max_span_limit=18" >> $cdec_ini
-  #echo "cubepruning_pop_limit=1200" >> $cdec_ini # Try 650 if 1200 is too slow
+  echo "scfg_max_span_limit=1$scfg_max_span_limit" >> $cdec_ini
+  echo "cubepruning_pop_limit=$cubepruning_pop_limit" >> $cdec-ini
 }
 
 task Tune
