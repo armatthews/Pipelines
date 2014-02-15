@@ -19,37 +19,8 @@ global {
 
 import ../submitters.tape
 
-task Tokenize
-    < corpus=(DataSection:
-                train=$train_corpus
-                tune=$tune_corpus
-                test=$test_corpus)
-    > tokenized_corpus
-    :: tokenize_corpus=@
-    :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
-  if [[ $tokenize_corpus == "false" ]]; then
-    cp $corpus $tokenized_corpus
-  else
-    cat $corpus | $cdec_dir/corpus/tokenize-anything.sh > $tokenized_corpus
-  fi
-}
-
-task Lowercase
-    < corpus=$tokenized_corpus@Tokenize
-    > lowercased_corpus
-    :: lowercase_corpus=@
-    :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
-  if [[ $lowercase_corpus == "false" ]]; then
-    cp $corpus $lowercased_corpus
-  else
-    cat $corpus | $cdec_dir/corpus/lowercase.pl > $lowercased_corpus
-  fi
-}
-
 task AlignS2T
-    < corpus=$lowercased_corpus@Lowercase[DataSection:train]
+    < corpus=$train_corpus
     > alignment
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$medium_task .q=shared {
@@ -57,7 +28,7 @@ task AlignS2T
 }
 
 task AlignT2S
-    < corpus=$lowercased_corpus@Lowercase[DataSection:train]
+    < corpus=$train_corpus
     > alignment
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$medium_task .q=shared {
@@ -74,11 +45,12 @@ task Symmetrize
 }
 
 task AddSentenceBoundaryTags
-    < in_corpus=$lowercased_corpus@Lowercase
-    < in_alignment=(ExtractSection:
-                      train=(UseCustomAlignment:
-                               no=$alignment@Symmetrize
-                               yes=$alignment)
+    < in_corpus=(DataSection:
+                  train=$train_corpus
+                  tune=$tune_corpus
+                  test=$test_corpus)
+    < in_alignment=(DataSection:
+                      train=$alignment@Symmetrize 
                       tune="/dev/null"
                       test="/dev/null")
     > corpus
@@ -93,17 +65,12 @@ task AddSentenceBoundaryTags
   perl $cdec_dir/corpus/add-sos-eos.pl $in_corpus $in_alignment $alignment > $corpus
 }
 
-# TODO: UseCustomAlignments: yes is broken if we do corpus filtering.
-#       Avoid this by either setting UseCustomAlignments: no, or by
-#       setting max_sentence_length=0, which disables filtering.
 task BuildSuffixArray
      < corpus=(UseSentenceBoundaries:
-                 no=$lowercased_corpus@Lowercase[DataSection:train]
-                 yes=$corpus@AddSentenceBoundaryTags[ExtractSection:train])
+                 no=$train_corpus
+                 yes=$corpus@AddSentenceBoundaryTags[DataSection:train])
      < alignment=(UseSentenceBoundaries:
-                    no=(UseCustomAlignment: 
-                          no=$alignment@Symmetrize
-                          yes=$alignment)
+                    no=$alignment@Symmetrize
                     yes=$alignment@AddSentenceBoundaryTags)
      > ini
      > suffix_array
@@ -115,7 +82,10 @@ task BuildSuffixArray
 
 task ExtractGrammars
     < corpus=(UseSentenceBoundaries:
-                no=$lowercased_corpus@Lowercase
+                no=(DataSection:
+                      train=$train_corpus
+                      tune=$tune_corpus
+                      test=$test_corpus)
                 yes=$corpus@AddSentenceBoundaryTags)
     < ini=@BuildSuffixArray
     > wrapped_corpus
@@ -128,7 +98,7 @@ task ExtractGrammars
 }
 
 task BuildLanguageModel
-    < corpus=$lowercased_corpus@Lowercase[DataSection:train]
+    < corpus=$train_corpus
     < lm_data=@
     > language_model
     :: lm_order=@
@@ -149,9 +119,7 @@ task CompileLanguageModel
 }
 
 task MakeCdecIni
-    < language_model=(UseCustomLM:
-                        no=$language_model@CompileLanguageModel
-                        yes=$language_model)
+    < language_model=$language_model@CompileLanguageModel
     > cdec_ini
     :: brown_cluster_map=@
     :: use_sentence_boundaries=(UseSentenceBoundaries: no="false" yes="true")
@@ -183,7 +151,7 @@ task MakeCdecIni
 }
 
 task Tune
-    < tune_set=$wrapped_corpus@ExtractGrammars[ExtractSection:tune]
+    < tune_set=$wrapped_corpus@ExtractGrammars[DataSection:tune]
     < cdec_ini=@MakeCdecIni
     > mira_work
     > optimized_weights
@@ -196,7 +164,7 @@ task Tune
 }
 
 task TuneWithMert
-    < tune_set=$wrapped_corpus@ExtractGrammars[ExtractSection:tune]
+    < tune_set=$wrapped_corpus@ExtractGrammars[DataSection:tune]
     < cdec_ini=@MakeCdecIni
     > mert_work
     > optimized_weights
@@ -233,8 +201,8 @@ task TuneWithMert
 
 task Decode
     < test_set=(TuneOrTest:
-        test=$wrapped_corpus@ExtractGrammars[ExtractSection:test]
-        tune=$wrapped_corpus@ExtractGrammars[ExtractSection:tune])
+        test=$wrapped_corpus@ExtractGrammars[DataSection:test]
+        tune=$wrapped_corpus@ExtractGrammars[DataSection:tune])
     < cdec_ini=@MakeCdecIni
     < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert)
     > kbest
