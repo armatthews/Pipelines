@@ -55,7 +55,6 @@ task AddSentenceBoundaryTags
                       test="/dev/null")
     > corpus
     > alignment
-    :: use_sentence_boundaries=@
     :: cdec_dir=@
     :: .submitter=shell .walltime="1:00:00" .cpus=1 .vmem=1g .q=shared {
   if [[ $in_alignment == "/dev/null" ]]; then
