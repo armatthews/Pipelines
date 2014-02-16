@@ -10,6 +10,7 @@ submitter torque_normal :: walltime
     echo "#PBS -l walltime=$walltime" >> $wrapper
     echo "#PBS -j oe" >> $wrapper
     echo "#PBS -o localhost:$PWD/ducttape_job_out.txt" >> $wrapper
+    echo "#PBS -e localhost:$PWD/ducttape_job_err.txt" >> $wrapper
     echo "#PBS -N $CONFIGURATION/$TASK/$REALIZATION" >> $wrapper
 
     echo "#PBS -m bea" >> $wrapper
@@ -67,6 +68,7 @@ submitter torque_shared :: walltime cpus vmem
     echo "#PBS -l walltime=$walltime" >> $wrapper
     echo "#PBS -j oe" >> $wrapper
     echo "#PBS -o localhost:$PWD/ducttape_job_out.txt" >> $wrapper
+    echo "#PBS -e localhost:$PWD/ducttape_job_err.txt" >> $wrapper
     echo "#PBS -N $CONFIGURATION/$TASK/$REALIZATION" >> $wrapper
 
     echo "#PBS -m bea" >> $wrapper
@@ -104,6 +106,16 @@ submitter torque_shared :: walltime cpus vmem
         $(cat ducttape_torque_jobid.txt) \
         ducttape_job_out.txt \
         ducttape_job.info
+    date >> timestamps.txt
+  }
+}
+
+submitter shell :: COMMANDS {
+  action run {
+    wrapper="ducttape_job.sh"
+    echo "$COMMANDS" > $wrapper
+    date > timestamps.txt
+    bash $wrapper
     date >> timestamps.txt
   }
 }
