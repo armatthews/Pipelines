@@ -166,9 +166,10 @@ task BuildLanguageModel
 task CompileLanguageModel
     < arpa=$language_model@BuildLanguageModel
     > language_model
+    :: lm_quant_flags=@
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
-  $cdec_dir/klm/lm/build_binary trie $arpa $language_model
+  $cdec_dir/klm/lm/build_binary $lm_quant_flags trie $arpa $language_model
 }
 
 task MakeCdecIni
