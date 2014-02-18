@@ -1,0 +1,1 @@
+/usr0/home/cdyer/wmt14/make-self-translations.pl
