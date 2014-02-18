@@ -26,6 +26,12 @@ global {
 
   cdec_dir="/home/armatthe/git/timber/cdec/"
   multeval="/home/armatthe/git/timber/multeval/multeval.sh"
+
+  scfg_max_span_limit=18
+  cubepruning_pop_limit=20
+  lm_quant_flags=""
+  brown_lm_order=7
+  cluster_map="/dev/null"
 }
 
 plan Full {
