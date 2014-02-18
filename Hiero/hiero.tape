@@ -168,7 +168,7 @@ task CompileLanguageModel
     > language_model
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
-  $cdec_dir/klm/lm/build_binary $arpa $language_model
+  $cdec_dir/klm/lm/build_binary trie $arpa $language_model
 }
 
 task MakeCdecIni
