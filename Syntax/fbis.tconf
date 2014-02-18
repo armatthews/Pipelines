@@ -37,6 +37,8 @@ global {
 
    sortRAM="20G"
    sortTempDir="."
+
+   filtering_rarity_threshold=0.3776
 }
 
 plan Full {

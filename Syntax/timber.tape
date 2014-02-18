@@ -456,9 +456,10 @@ task FilterToTestSet
     :: numCores=$filteringCores
     :: timberRoot=@
     :: scriptDir=@
+    :: filtering_rarity_threshold=@
     :: .submitter=$full_node_scheduler .walltime="72:00:00" {
   cp $scoreNames ./scoreNames
-  bash $scriptDir/filtering.sh $fullGrammar $source $trainTargetTrees ./scoreNames $numCores $filteredGrammarsDir 0.3776
+  bash $scriptDir/filtering.sh $fullGrammar $source $trainTargetTrees ./scoreNames $numCores $filteredGrammarsDir $filtering_rarity_threshold
 }
 
 task CombineGrammars
