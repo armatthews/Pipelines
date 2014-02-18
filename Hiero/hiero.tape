@@ -59,6 +59,7 @@ task AddSentenceBoundaryTags
     :: .submitter=shell .walltime="1:00:00" .cpus=1 .vmem=1g .q=shared {
   if [[ $in_alignment == "/dev/null" ]]; then
     perl $cdec_dir/corpus/add-sos-eos.pl $in_corpus > $corpus
+    touch $alignment
   else
     perl $cdec_dir/corpus/add-sos-eos.pl $in_corpus $in_alignment $alignment > $corpus
   fi
@@ -127,18 +128,28 @@ task MakeGlueGrammars
 
 task LMBrownClusters
     < lm_data=@
+    < corpus=$train_corpus
     < cluster_map=@
-    > out
+    > out_lm_data
+    > out_corpus
+    :: cdec_dir=@
     :: script_dir=@
     :: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=2 .vmem=$medium_task .q=shared {
-  zcat -f $lm_data | python $script_dir/map_clusters.py $cluster_map | gzip > out
+  zcat -f $lm_data | python $script_dir/map_clusters.py $cluster_map | gzip > $out_lm_data
+  zcat -f $corpus | $cdec_dir/corpus/cut-corpus.pl 2 | python $script_dir/map_clusters.py $cluster_map > ./out_corpus_tgt
+
+  # Repackage the test corpus as a parallel corpus, as the BuildLanguageModel expects one
+  $cdec_dir/corpus/paste-files.pl <(zcat -f $corpus | $cdec_dir/corpus/cut-corpus.pl 1) ./out_corpus_tgt > $out_corpus
+  rm ./out_corpus_tgt
 }    
 
 task BuildLanguageModel
-    < corpus=$train_corpus
+    < corpus=(LMType:
+                 surface=$train_corpus
+                 brown=$out_corpus@LMBrownClusters)
     < lm_data=(LMType:
                  surface=$lm_data
-                 brown=$out@LMBrownClusters)
+                 brown=$out_lm_data@LMBrownClusters)
     > language_model
     :: lm_order=(LMType:
                    surface=$lm_order
@@ -148,7 +159,7 @@ task BuildLanguageModel
   corpus_target="./corpus_target"
   $cdec_dir/corpus/cut-corpus.pl 2 $corpus > $corpus_target
   zcat -f $lm_data >> $corpus_target
-  $cdec_dir/klm/lm/builder/lmplz --order $lm_order -T . --text $corpus_target --arpa $language_model
+  $cdec_dir/klm/lm/builder/lmplz --order $lm_order -T . -S 10% --text $corpus_target --arpa $language_model
   rm $corpus_target
 }
 
@@ -191,7 +202,7 @@ task MakeCdecIni
     echo "feature_function=SourcePathFeatures" >> $cdec_ini # Chris says to be leery of these
   fi
 
-  echo "scfg_max_span_limit=1$scfg_max_span_limit" >> $cdec_ini
+  echo "scfg_max_span_limit=$scfg_max_span_limit" >> $cdec_ini
   echo "cubepruning_pop_limit=$cubepruning_pop_limit" >> $cdec-ini
 }
 
