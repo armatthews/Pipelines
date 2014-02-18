@@ -59,7 +59,7 @@ task AddSentenceBoundaryTags
     :: .submitter=shell .walltime="1:00:00" .cpus=1 .vmem=1g .q=shared {
   if [[ $in_alignment == "/dev/null" ]]; then
     perl $cdec_dir/corpus/add-sos-eos.pl $in_corpus > $corpus
-    touch $alignment
+    cat $in_alignment > $alignment
   else
     perl $cdec_dir/corpus/add-sos-eos.pl $in_corpus $in_alignment $alignment > $corpus
   fi
@@ -214,7 +214,7 @@ task Tune
     > optimized_weights
     :: cores=$decode_cores
     :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
+    :: .submitter=$full_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
 
   python $cdec_dir/training/mira/mira.py --jobs $cores --kbest-size 500 -d $tune_set -o $mira_work -c $cdec_ini --step-size 0.001 >mira_out.txt 2>mira_err.txt
   ln -s $mira_work/weights.final $optimized_weights
@@ -227,7 +227,7 @@ task TuneWithMert
     > optimized_weights
     :: cores=$decode_cores
     :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
+    :: .submitter=$full_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
   initialWeights="./initialWeights.txt"
   echo 'CountEF 0.19419531547'            >> $initialWeights
   echo 'EgivenFCoherent -0.143753598764'  >> $initialWeights
@@ -267,7 +267,7 @@ task Decode
     :: k=1000
     :: cores=$decode_cores
     :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="6:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
+    :: .submitter=$full_node_scheduler .walltime="6:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
 
   cat $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > $kbest
   sed 's/ ||| /\t/g' $kbest | sort -u -k 1,1 -n | cut -f 2 > $output
