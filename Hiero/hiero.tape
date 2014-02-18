@@ -122,7 +122,7 @@ task MakeGlueGrammars
     :: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   mkdir -p $grammar_dir
   script_location="/usr0/home/cdyer/wmt14/make-self-translations.pl"
-  $cdec_dir/corpus/paste-files.pl paste <(perl $cdec_dir/corpus/cut-corpus.pl 1 $test_set) $bio_tags | \
+  $cdec_dir/corpus/paste-files.pl <(perl $cdec_dir/corpus/cut-corpus.pl 1 $test_set) $bio_tags | \
     perl $script_dir/make-self-translations.pl $grammar_dir
 }
 
