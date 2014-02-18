@@ -173,7 +173,7 @@ task CompileLanguageModel
 }
 
 task MakeCdecIni
-    < language_model=$language_model@CompileLanguageModel
+    < language_model=$language_model@CompileLanguageModel[LMType:surface]
     > cdec_ini
     :: cluster_map=@
     :: use_sentence_boundaries_flag=(UseSentenceBoundaries:
@@ -204,12 +204,26 @@ task MakeCdecIni
   fi
 
   echo "scfg_max_span_limit=$scfg_max_span_limit" >> $cdec_ini
-  echo "cubepruning_pop_limit=$cubepruning_pop_limit" >> $cdec-ini
+  echo "cubepruning_pop_limit=$cubepruning_pop_limit" >> $cdec_ini
+}
+
+task AddBrownLMToCdecIni
+    < input_cdec_ini=$cdec_ini@MakeCdecIni
+    < language_model=$language_model@CompileLanguageModel[LMType:brown]
+    :: use_sentence_boundaries_flag=(UseSentenceBoundaries:
+                                       no=""
+                                       yes="-x ")
+    :: cluster_map=@
+    > cdec_ini {
+  cp $input_cdec_ini $cdec_ini
+  echo "feature_function=KLanguageModel $use_sentence_boundaries_flag -m $cluster_map $language_model" >> $cdec_ini
 }
 
 task Tune
     < tune_set=$wrapped_corpus@ExtractGrammars[DataSection:tune]
-    < cdec_ini=@MakeCdecIni
+    < cdec_ini=(UseBrownLM:
+                  no=$cdec_ini@MakeCdecIni
+                  yes=$cdec_ini@AddBrownLMToCdecIni)
     > mira_work
     > optimized_weights
     :: cores=$decode_cores
@@ -222,7 +236,9 @@ task Tune
 
 task TuneWithMert
     < tune_set=$wrapped_corpus@ExtractGrammars[DataSection:tune]
-    < cdec_ini=@MakeCdecIni
+    < cdec_ini=(UseBrownLM:
+                  no=$cdec_ini@MakeCdecIni
+                  yes=$cdec_ini@AddBrownLMToCdecIni)
     > mert_work
     > optimized_weights
     :: cores=$decode_cores
@@ -260,7 +276,9 @@ task Decode
     < test_set=(TuneOrTest:
         test=$wrapped_corpus@ExtractGrammars[DataSection:test]
         tune=$wrapped_corpus@ExtractGrammars[DataSection:tune])
-    < cdec_ini=@MakeCdecIni
+    < cdec_ini=(UseBrownLM:
+                  no=$cdec_ini@MakeCdecIni
+                  yes=$cdec_ini@AddBrownLMToCdecIni) 
     < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert)
     > kbest
     > output
