@@ -6,11 +6,8 @@ global {
   tune_corpus="/home/armatthe/FBIS/TestSets/mt06/mt06.zhen"
   test_corpus=(PickTestSet: mt03="/home/armatthe/FBIS/TestSets/mt03/mt03.zhen"
 			    mt08="/home/armatthe/FBIS/TestSets/mt08/mt08.zhen")
-
-  alignment="/home/armatthe/Research/FBIS/alignment.txt"
+  # Need to fill in LM data now
   lm_data="/dev/null"
-
-  language_model="/oasis/projects/nsf/cmu126/ghannema/lms/c2e.3gram.trie"
 }
 
 global {
@@ -35,5 +32,5 @@ global {
 }
 
 plan Full {
-  reach Evaluate via (TuneOrTest: test tune) * (UseCustomAlignment: yes) * (UseCustomLM: yes) * (PickTestSet: mt03 mt08)
+  reach Evaluate via (TuneOrTest: test tune) * (PickTestSet: mt03 mt08) * (Optimizer: mira) * (UseSourcePathFeatures: yes) * (UseNGramFeatures: yes) * (UseSentenceBoundaries: yes)
 }
