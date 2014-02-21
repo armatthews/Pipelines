@@ -13,7 +13,7 @@ class Segment:
 	def from_string(sgml):
 		sgml = sgml.encode('utf-8') if isinstance(sgml, unicode) else sgml
 		 # The parser doesn't appreciate ampersands that aren't part of XML entities
-		sgml = sgml.replace('&', '&amp;');
+		sgml = sgml.replace('&', '&amp;');	
 		root = ElementTree.fromstring(sgml)
 		text = root.text if isinstance(root.text, unicode) else root.text.decode('utf-8')
 		attrib = {key.decode('utf-8') : value.decode('utf-8') for key, value in root.attrib.iteritems()}	
@@ -24,8 +24,8 @@ class Segment:
 		self.attrib = attrib
 
 	def __str__(self):
-		root = ElementTree.Element("seg", segment.attrib)
-		root.text = segment.text
+		root = ElementTree.Element("seg", self.attrib)
+		root.text = self.text
 		return ElementTree.tostring(root, 'utf-8').replace('&amp;', '&')
 
 	def add_grammar(self, filename):
@@ -60,9 +60,10 @@ class Segment:
 		
 if __name__ == "__main__":
 	sgml = "<seg id=\"0\" grammar=\"/oasis/projects/nsf/cmu126/armatthe/Research/Systems/dede-enus-wmt14/ducttape/MakeGlueGrammars/Corpus.cleaner+DataSection.tune/grammar_dir/pt.0.gz\" grammar1=\"/oasis/projects/nsf/cmu126/armatthe/Research/Systems/dede-enus-wmt14/ducttape/MakeGlueGrammars/Corpus.cleaner+DataSection.tune/grammar_dir/pt.1.gz\">  This & नमस्ते &amp; text   </seg>"	
+#	sgml = "<seg id=\"0\" grammar=\"/oasis/projects/nsf/cmu126/armatthe/Research/Systems/dede-enus-wmt14/ducttape/MakeGlueGrammars/Corpus.cleaner+DataSection.tune/grammar_dir/pt.0.gz\" grammar1=\"/oasis/projects/nsf/cmu126/armatthe/Research/Systems/dede-enus-wmt14/ducttape/MakeGlueGrammars/Corpus.cleaner+DataSection.tune/grammar_dir/pt.1.gz\">  <s> This & नमस्ते &amp; text </s>   </seg>"	
 	segment = Segment.from_string(sgml)
 	print segment.text
 	print segment.attrib
 	print segment
-	for rule in segment.rules:
-		print rule
+	#for rule in segment.rules:
+	#	print rule
