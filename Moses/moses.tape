@@ -17,10 +17,83 @@ global {
 
 import ../submitters.tape
 
+task CutCorpus
+    < train_corpus=@
+    < tune_corpus=@
+    < test_corpus=@
+    > source
+    > target
+    > tuneSetSource
+    > tuneSetRefs
+    > testSetSource
+    > testSetRefs
+    :: cdec_dir=@
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
+  $cdec_dir/corpus/cut-corpus.pl 1 $train_corpus > $source
+  $cdec_dir/corpus/cut-corpus.pl 2 $train_corpus > $target
+  $cdec_dir/corpus/cut-corpus.pl 1 $tune_corpus > $tuneSetSource
+  $cdec_dir/corpus/cut-corpus.pl 2 $tune_corpus > $tuneSetRefs
+  $cdec_dir/corpus/cut-corpus.pl 1 $test_corpus > $testSetSource
+  $cdec_dir/corpus/cut-corpus.pl 2 $test_corpus > $testSetRefs
+}
+
+task AlignS2T
+    < corpus=$train_corpus
+    > alignment
+    :: cdec_dir=@
+    :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+  $cdec_dir/word-aligner/fast_align -i $corpus -d -v -o > $alignment
+}
+
+task AlignT2S
+    < corpus=$train_corpus
+    > alignment
+    :: cdec_dir=@
+    :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+  $cdec_dir/word-aligner/fast_align -i $corpus -d -v -o -r > $alignment
+}
+
+task Symmetrize
+    < s2tAlignment=$alignment@AlignS2T
+    < t2sAlignment=$alignment@AlignT2S
+    > alignment
+    :: cdec_dir=@
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
+  $cdec_dir/utils/atools -i $s2tAlignment -j $t2sAlignment -c grow-diag-final-and > $alignment
+}
+
+task BuildLanguageModel
+    < target=@CutCorpus
+    < lm_data=@
+    > language_model
+    :: lm_order=@
+    :: traintgt=@
+    :: moses=@
+    :: cdec_dir=@
+    :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+  if [[ $traintgt == "true" ]]; then
+     $moses/bin/lmplz -o $lm_order -T . -S 10% < $target > $language_model
+  else
+     combined_lm_data = "./combined_lm_data"
+     cat $target $lm_data > $combined_lm_data
+     $moses/bin/lmplz -o $lm_order -T . -S 10% < $combined_lm_data > $language_model
+  fi
+}
+
+task CompileLanguageModel
+    < arpa=$language_model@BuildLanguageModel
+    > language_model
+    :: lm_quant_flags=@
+    :: moses=@
+    :: cdec_dir=@
+    :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+  $moses/bin/build_binary $lm_quant_flags trie $arpa $language_model
+}
+
 task LexicalProbs
-    < source=@
-    < target=@
-    < alignment=@
+    < source=@CutCorpus
+    < target=@CutCorpus
+    < alignment=@Symmetrize
     > lex_f2e=lex.f2e
     > lex_e2f=lex.e2f
     :: moses=@
@@ -29,9 +102,9 @@ task LexicalProbs
 }
 
 task ExtractPhrases
-    < source=@
-    < target=@
-    < alignment=@
+    < source=@CutCorpus
+    < target=@CutCorpus
+    < alignment=@Symmetrize
     > phrase_instances=phrase_instances.sorted.gz
     > phrase_instances_inverse=phrase_instances.inv.sorted.gz
     > phrase_orientations=phrase_orientations.sorted.gz
@@ -81,8 +154,8 @@ task ScorePhrases
 task MakeMosesIni
     < scored_phrase_table=@ScorePhrases
     < reordering_table=@BuildReorderingModel
+    < languageModel=$language_model@CompileLanguageModel
     > mosesIni=moses-init.ini
-    :: languageModel=@
     :: ttable_limit=@
     :: reordering_model_type=@
     :: distortion_limit=@
@@ -151,7 +224,7 @@ task MakeMosesIni
 
 task FilterPhraseTable
     < scored_phrase_table=@ScorePhrases
-    < source=(TuneOrTest: test=$testSetSource tune=$tuneSetSource)
+    < source=(TuneOrTest: test=$testSetSource@CutCorpus tune=$tuneSetSource@CutCorpus)
     < mosesIni=@MakeMosesIni
     > filtered_pt
     > filteredMosesIni=filtered_pt/moses.ini
@@ -175,8 +248,8 @@ task BuildReorderingModel
 }
 
 task Tune
-    < src=$tuneSetSource
-    < refs=$tuneSetRefs
+    < src=$tuneSetSource@CutCorpus
+    < refs=$tuneSetRefs@CutCorpus
     < mosesIni=$filteredMosesIni@FilterPhraseTable[TuneOrTest:tune]
     > tunedMosesIni=moses.ini
     :: cores=$decode_cores
@@ -216,8 +289,8 @@ task MakeFilteredMosesIni
 task Decode
     < mosesIni=@MakeFilteredMosesIni
     < src=(TuneOrTest:
-        test=$testSetSource
-        tune=$tuneSetSource)
+        test=$testSetSource@CutCorpus
+        tune=$tuneSetSource@CutCorpus)
     > output
     :: cores=$decode_cores
     :: moses=@
@@ -228,8 +301,8 @@ task Decode
 task Evaluate
     < output=$output@Decode
     < refs=(TuneOrTest:
-      test=$testSetRefs
-      tune=$tuneSetRefs)
+      test=$testSetRefs@CutCorpus
+      tune=$tuneSetRefs@CutCorpus)
     > bleu meteor ter length
     :: multeval=@
     :: meteor_task=@
