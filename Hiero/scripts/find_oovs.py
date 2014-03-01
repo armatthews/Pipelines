@@ -17,10 +17,12 @@ oovs = set()
 for line in sys.stdin:
 	line = line.decode('utf-8')
 	parts = [part.strip() for part in line.split('|||')]
-	source_sgml = parts[0]	
+	source_sgml = parts[0]
+	source_sgml = source_sgml.replace('<s>', '&lt;s&gt;').replace('</s>', '&lt;/s&gt;')
 	segment = sgml.Segment.from_string(source_sgml)
 	vocab = extract_vocab_from_rules(segment.rules)
 
+	segment.text = segment.text.replace('&lt;s&gt;', '<s>').replace('&lt;/s&gt;', '</s>')
 	words = [word.strip() for word in segment.text.split() if len(word.strip()) != 0]
 	for word in words:
 		if word not in vocab and word not in oovs:

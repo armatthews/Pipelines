@@ -7,7 +7,7 @@ parser.add_argument('cluster_map')
 parser.add_argument('--prefix_length', '-p', type=int, default=0, help='Keep only the first p characters of each cluster ID')
 args = parser.parse_args()
 
-clusters = defaultdict(lambda: '<UNK>')
+clusters = defaultdict(lambda: '<unk>')
 cluster_file = open(args.cluster_map)
 for line in cluster_file:
 	line = line.decode('utf-8').strip()
