@@ -74,7 +74,7 @@ task BuildLanguageModel
   if [[ $traintgt == "true" ]]; then
      $moses/bin/lmplz -o $lm_order -T . -S 10% < $target > $language_model
   else
-     combined_lm_data = "./combined_lm_data"
+     combined_lm_data="./combined_lm_data"
      cat $target $lm_data > $combined_lm_data
      $moses/bin/lmplz -o $lm_order -T . -S 10% < $combined_lm_data > $language_model
   fi
