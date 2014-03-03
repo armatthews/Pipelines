@@ -159,7 +159,7 @@ task BuildLanguageModel
   corpus_target="./corpus_target"
   $cdec_dir/corpus/cut-corpus.pl 2 $corpus > $corpus_target
   zcat -f $lm_data >> $corpus_target
-  $cdec_dir/klm/lm/builder/lmplz --order $lm_order -T . -S 10% --text $corpus_target --arpa $language_model
+  $cdec_dir/../mosesdecoder/bin/lmplz --order $lm_order -T . -S 10% < $corpus_target > $language_model
   rm $corpus_target
 }
 
@@ -272,23 +272,50 @@ task TuneWithMert
   ln -s $mert_work/weights.final $optimized_weights
 }
 
-task Decode
-    < test_set=(TuneOrTest:
-        test=$wrapped_corpus@ExtractGrammars[DataSection:test]
-        tune=$wrapped_corpus@ExtractGrammars[DataSection:tune])
-    < cdec_ini=(UseBrownLM:
-                  no=$cdec_ini@MakeCdecIni
-                  yes=$cdec_ini@AddBrownLMToCdecIni) 
-    < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert)
-    > kbest
-    > output
-    :: k=1000
-    :: cores=$decode_cores
-    :: cdec_dir=@
-    :: .submitter=$full_node_scheduler .walltime="6:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
+#task OldDecode
+#    < test_set=(TuneOrTest:
+#        test=$wrapped_corpus@ExtractGrammars[DataSection:test]
+#        tune=$wrapped_corpus@ExtractGrammars[DataSection:tune])
+#    < cdec_ini=(UseBrownLM:
+#                  no=$cdec_ini@MakeCdecIni
+#                  yes=$cdec_ini@AddBrownLMToCdecIni) 
+#    < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert)
+#    > kbest
+#    > output
+#    :: k=1000
+#    :: cores=$decode_cores
+#    :: cdec_dir=@
+#    :: .submitter=$full_node_scheduler .walltime="6:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
+#
+#  cat $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > $kbest
+#  sed 's/ ||| /\t/g' $kbest | sort -u -k 1,1 -n | cut -f 2 > $output
+#}
 
-  cat $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > $kbest
-  sed 's/ ||| /\t/g' $kbest | sort -u -k 1,1 -n | cut -f 2 > $output
+task Decode
+   < test_set=(TuneOrTest:
+       test=$wrapped_corpus@ExtractGrammars[DataSection:test]
+       tune=$wrapped_corpus@ExtractGrammars[DataSection:tune])
+   < cdec_ini=(UseBrownLM:
+		no=$cdec_ini@MakeCdecIni
+		yes=$cdec_ini@AddBrownLMToCdecIni)
+   < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert)
+   > kbest
+   > output
+   :: k=1000
+   :: cores=$decode_cores
+   :: cdec_dir=@
+   :: .submitter=$full_node_scheduler .walltime="6:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
+
+ num_lines=$(cat $test_set | wc -l)
+ lines_per_piece=$(echo "( $num_lines + $cores - 1 ) / $cores" | bc)
+ mkdir split
+ cd split
+ split -a 2 -d -l $lines_per_piece $test_set "piece_"
+ ls -1 piece_* | parallel -j $cores "cat {} | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > kbest_{}"
+ cd ..
+ echo split/kbest* | sort -n | xargs cat > $kbest
+ #cat $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > $kbest
+ sed 's/ ||| /\t/g' $kbest | sort -u -k 1,1 -n | cut -f 2 | sed 's/<\/\?s>//g' | sed 's/\s\+/ /g' | sed 's/^\s*\|\s*$//g' > $output
 }
 
 task Evaluate 
