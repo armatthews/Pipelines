@@ -70,13 +70,10 @@ task BuildLanguageModel
     :: use_custom_lm=@
     :: custom_lm=@
     :: lm_order=@
-    :: traintgt=@
     :: moses=@
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
-  if [[ $traintgt == "true" ]]; then
-     $moses/bin/lmplz -o $lm_order -T . -S 10% < $target > $language_model
-  elif [[ $use_custom_lm == "true" ]]; then
+  if [[ $use_custom_lm == "true" ]]; then
      cp $custom_lm $language_model
   else
      combined_lm_data="./combined_lm_data"
