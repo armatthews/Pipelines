@@ -57,15 +57,18 @@ task Symmetrize
     < s2tAlignment=$alignment@AlignS2T
     < t2sAlignment=$alignment@AlignT2S
     > alignment
+    :: symmetrization_heuristic=@
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
-  $cdec_dir/utils/atools -i $s2tAlignment -j $t2sAlignment -c grow-diag-final-and > $alignment
+  $cdec_dir/utils/atools -i $s2tAlignment -j $t2sAlignment -c $symmetrization_heuristic > $alignment
 }
 
 task BuildLanguageModel
     < target=@CutCorpus
     < lm_data=@
     > language_model
+    :: use_custom_lm=@
+    :: custom_lm=@
     :: lm_order=@
     :: traintgt=@
     :: moses=@
@@ -73,6 +76,8 @@ task BuildLanguageModel
     :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   if [[ $traintgt == "true" ]]; then
      $moses/bin/lmplz -o $lm_order -T . -S 10% < $target > $language_model
+  elif [[ $use_custom_lm == "true" ]]; then
+     cp $custom_lm $language_model
   else
      combined_lm_data="./combined_lm_data"
      cat $target $lm_data > $combined_lm_data
