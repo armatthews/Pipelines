@@ -154,22 +154,34 @@ task BuildLanguageModel
     :: lm_order=(LMType:
                    surface=$lm_order
                    brown=$brown_lm_order)
+    :: use_custom_lm=@
+    :: custom_lm=@
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
-  corpus_target="./corpus_target"
-  $cdec_dir/corpus/cut-corpus.pl 2 $corpus > $corpus_target
-  zcat -f $lm_data >> $corpus_target
-  $cdec_dir/../mosesdecoder/bin/lmplz --order $lm_order -T . -S 10% < $corpus_target > $language_model
-  rm $corpus_target
+  if [[ $use_custom_lm == "true" ]]; then
+     cp $custom_lm $language_model
+  else
+     corpus_target="./corpus_target"
+     $cdec_dir/corpus/cut-corpus.pl 2 $corpus > $corpus_target
+     zcat -f $lm_data >> $corpus_target
+     $cdec_dir/../mosesdecoder/bin/lmplz --order $lm_order -T . -S 10% < $corpus_target > $language_model
+     rm $corpus_target
+  fi
 }
 
 task CompileLanguageModel
     < arpa=$language_model@BuildLanguageModel
     > language_model
     :: lm_quant_flags=@
+    :: use_custom_lm=@
+    :: custom_lm=@
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
-  $cdec_dir/klm/lm/build_binary $lm_quant_flags trie $arpa $language_model
+ if [[ $use_custom_lm == "true" ]]; then
+     cp $custom_lm $language_model
+ else
+     $cdec_dir/klm/lm/build_binary $lm_quant_flags trie $arpa $language_model
+ fi
 }
 
 task MakeCdecIni
