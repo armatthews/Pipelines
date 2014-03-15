@@ -3,18 +3,18 @@
 global {
   ducttape_experimental_submitters=enable
   ducttape_experimental_imports=enable
-  full_node_scheduler=shell
-  #full_node_scheduler=torque_normal
-  partial_node_scheduler=shell
-  #partial_node_scheduler=torque_shared
+  #full_node_scheduler=shell
+  full_node_scheduler=torque_normal
+  #partial_node_scheduler=shell
+  partial_node_scheduler=torque_shared
   tiny_task=2g
-  small_task=4g
-  medium_task=30g
-  #medium_task=32g
-  big_task=30g
-  #big_task=60g
-  many_cpus=8
-  #many_cpus=32
+  small_task=8g
+  #medium_task=30g
+  medium_task=32g
+  #big_task=30g
+  big_task=60g
+  #many_cpus=8
+  many_cpus=32
 }
 
 import ../submitters.tape
@@ -90,9 +90,10 @@ task ExtractGrammars
     < ini=@BuildSuffixArray
     > wrapped_corpus
     > grammar_dir
-    :: cores=1
+    :: cores=4
     :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="24:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+    :: .submitter=$full_node_scheduler .walltime="24:00:00" .cpus=$many_cpus .vmem=$medium_task .q=normal {
+  # This uses ~13 GB of RAM per core!
   export PYTHONPATH=`echo $cdec_dir/python/build/lib.*`
   cat $corpus | python -m cdec.sa.extract -c $ini -g $grammar_dir -j $cores -z > $wrapped_corpus
 }
@@ -104,13 +105,24 @@ task TagPassthroughs
                   test=$test_corpus)
     > bio_tags
     :: magic="Something Swabha gives me? lol"
+    :: tag_passthroughs=(UsePassthroughTagger: no yes)
     :: script_dir=@
-    :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=1 .vmem=$medium_task .q=shared {
-  pv $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | python $script_dir/tag_passthroughs.py > $bio_tags
+    :: cdec_dir=@ {
+    #:: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+  if [[ $tag_passthroughs == "yes" ]]; then
+    bash /home/armatthe/git/transliteration/prep.sh $test_set > dat
+    python /home/armatthe/git/transliteration/decoder.py \
+      ./dat \
+      /home/armatthe/git/transliteration/final.model \
+      /home/armatthe/git/transliteration/gaz.dat \
+      /home/armatthe/git/transliteration/brown.dat > output.dat
+    cat output.dat | rev | cut -f 1 | rev | python /home/armatthe/Tools/paste-s-with-newlines.py > $bio_tags
+  else
+    pv $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | python $script_dir/tag_passthroughs.py > $bio_tags
+  fi
 }
 
-task MakeGlueGrammars
+task MakePassThroughGrammars
     < test_set=(DataSection:
                   train=$train_corpus
                   tune=$tune_corpus
@@ -118,18 +130,129 @@ task MakeGlueGrammars
     < bio_tags=@TagPassthroughs
     > grammar_dir
     :: script_dir=@
-    :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+    :: cdec_dir=@ {
+    #:: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   mkdir -p $grammar_dir
   script_location="/usr0/home/cdyer/wmt14/make-self-translations.pl"
   $cdec_dir/corpus/paste-files.pl <(perl $cdec_dir/corpus/cut-corpus.pl 1 $test_set) $bio_tags | \
     perl $script_dir/make-self-translations.pl $grammar_dir
 }
 
+task AddPassThroughGrammars
+    < in_corpus=$wrapped_corpus@ExtractGrammars
+    < grammar_dir=(UsePassThroughGrammars:
+                     no=""
+                     yes=$grammar_dir@MakePassThroughGrammars)
+    > wrapped_corpus
+    :: use_passthrough_grammars=(UsePassThroughGrammars: no yes)
+    :: script_dir=@ {
+  if [[ $use_passthrough_grammars == "yes" ]]; then
+    pv $in_corpus | python $script_dir/add_passthrough_grammars.py "pt" "$grammar_dir" > $wrapped_corpus
+  else
+    cp $in_corpus $wrapped_corpus
+  fi
+}
+
+task FindOOVs
+    < corpus=$wrapped_corpus@ExtractGrammars
+    > oovs
+    :: script_dir=@
+    :: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+  pv $corpus | python $script_dir/find_oovs.py > $oovs
+}
+
+# TODO: We should generate the labels, weights, and charlm to make this more general
+task MakeTranslitGrammars
+    < oovs=@FindOOVs
+    > translit_grammar
+    :: translit_dir=@
+    :: translit_labels=@
+    :: translit_weights=@
+    :: translit_charlm=@
+    :: translit_kbest=@
+    :: cdec_dir=@
+    :: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+  python $translit_dir/translit-oovs.py \
+    -cdec ~/git/timber/cdec \
+    -transliterator $translit_dir \
+    -labels $translit_labels \
+    -weights $translit_weights \
+    -oov $oovs \
+    -kbest $translit_kbest \
+    -charlm $translit_charlm \
+    -grammar $translit_grammar
+}
+
+task AddTranslitGrammars
+    < in_corpus=$wrapped_corpus@AddPassThroughGrammars
+    < translit_grammar=(UseTranslitGrammars:
+                          no=""
+                          yes=$translit_grammar@MakeTranslitGrammars)
+    > wrapped_corpus
+    :: use_translit_grammars=(UseTranslitGrammars: no yes)
+    :: script_dir=@ {
+  if [[ $use_translit_grammars == "yes" ]]; then
+    pv $in_corpus | python $script_dir/add_translit_grammar.py "$translit_grammar" > $wrapped_corpus
+  else
+    cp $in_corpus $wrapped_corpus
+  fi
+}
+
+task AddNEGrammar
+    < in_corpus=$wrapped_corpus@AddTranslitGrammars
+    < ne_grammar=@
+    > wrapped_corpus
+    :: use_ne_grammar=(UseNEGrammar: no yes)
+    :: script_dir=@ {
+  if [[ $use_ne_grammar == "yes" ]]; then
+    pv $in_corpus | python $script_dir/add_translit_grammar.py "$ne_grammar" > $wrapped_corpus
+  else
+    cp $in_corpus $wrapped_corpus
+  fi
+}
+
+task AddAvneeshGrammar
+    < in_corpus=$wrapped_corpus@AddNEGrammar
+    < avneesh_grammar=@
+    > wrapped_corpus
+    :: use_avneesh_grammar=(UseAvneeshGrammar: no yes)
+    :: script_dir=@ {
+  if [[ $use_aveneesh_grammar == "yes" ]]; then
+    pv $in_corpus | python $script_dir/add_translit_grammar.py "$avneesh_grammar" > $wrapped_corpus
+  else
+    cp $in_corpus $wrapped_corpus
+  fi
+}
+
+task MakeSyntheticGrammars
+    < in_grammar_dir=$grammar_dir@ExtractGrammars
+    > grammar_dir
+    :: .submitter=$full_node_scheduler .walltime="4:00:00" .cpus=2 .vmem=$big_task .q=normal {
+  bash /oasis/projects/nsf/cmu126/armatthe/wmt14/run.sh $in_grammar_dir ./yulia_dir
+  ln -s ./yulia_dir/grammars $grammar_dir
+}
+
+task AddSyntheticGrammars
+    < in_corpus=$wrapped_corpus@AddAvneeshGrammar
+    < grammar_dir=(UseSyntheticGrammars:
+                     no=""
+                     yes=$grammar_dir@MakeSyntheticGrammars)
+    > wrapped_corpus
+    :: use_synthetic_grammars=(UseSyntheticGrammars: no yes)
+    :: script_dir=@ {
+  if [[ $use_synthetic_grammars == "yes" ]]; then
+    pv $in_corpus | python $script_dir/add_passthrough_grammars.py "grammar" "$grammar_dir" > $wrapped_corpus
+  else
+    cp $in_corpus $wrapped_corpus
+  fi
+}
+
 task LMBrownClusters
     < lm_data=@
     < corpus=$train_corpus
-    < cluster_map=@
+    < cluster_map=(LMSide:
+                     target=$target_cluster_map
+                     source=$source_cluster_map)
     > out_lm_data
     > out_corpus
     :: cdec_dir=@
@@ -151,22 +274,23 @@ task BuildLanguageModel
                  surface=$lm_data
                  brown=$out_lm_data@LMBrownClusters)
     > language_model
-    :: lm_order=(LMType:
-                   surface=$lm_order
-                   brown=$brown_lm_order)
-    :: use_custom_lm=@
-    :: custom_lm=@
+    :: lm_side_index=(LMSide:
+                        target=2
+                        source=1)
+    :: lm_order=(LMSide:
+                   target=(LMType:
+                             surface=$lm_order
+                             brown=$brown_lm_order)
+                   source=(LMType:
+                             surface=2
+                             brown=2))
     :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
-  if [[ $use_custom_lm == "true" ]]; then
-     cp $custom_lm $language_model
-  else
-     corpus_target="./corpus_target"
-     $cdec_dir/corpus/cut-corpus.pl 2 $corpus > $corpus_target
-     zcat -f $lm_data >> $corpus_target
-     $cdec_dir/../mosesdecoder/bin/lmplz --order $lm_order -T . -S 10% < $corpus_target > $language_model
-     rm $corpus_target
-  fi
+    :: .submitter=$full_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$big_task .q=normal {
+  corpus_target="./corpus_target"
+  $cdec_dir/corpus/cut-corpus.pl $lm_side_index $corpus > $corpus_target
+  zcat -f $lm_data >> $corpus_target
+  $cdec_dir/klm/lm/builder/lmplz --order $lm_order -T . -S 90% --text $corpus_target --arpa $language_model
+  rm $corpus_target
 }
 
 task CompileLanguageModel
@@ -176,87 +300,94 @@ task CompileLanguageModel
     :: use_custom_lm=@
     :: custom_lm=@
     :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
- if [[ $use_custom_lm == "true" ]]; then
-     cp $custom_lm $language_model
- else
-     $cdec_dir/klm/lm/build_binary $lm_quant_flags trie $arpa $language_model
- fi
+    :: .submitter=$full_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$big_task .q=normal {
+  $cdec_dir/klm/lm/build_binary -T . -S 90% $lm_quant_flags trie $arpa $language_model
 }
 
 task MakeCdecIni
-    < language_model=$language_model@CompileLanguageModel[LMType:surface]
+    < language_model=$language_model@CompileLanguageModel[LMType:surface,LMSide:target]
+    < brown_lm=(UseBrownLM: no="/dev/null" yes=$language_model@CompileLanguageModel[LMType:brown,LMSide:target])
+    < src_lm=(UseSourceLM: no="/dev/null" yes=$language_model@CompileLanguageModel[LMType:surface,LMSide:source])
     > cdec_ini
-    :: cluster_map=@
-    :: use_sentence_boundaries_flag=(UseSentenceBoundaries:
-                                       no=""
-                                       yes="-x ")
-    :: use_ngram_features=(UseNGramFeatures:
-                             yes="true"
-                             no="false")
-    :: use_source_path_features=(UseSourcePathFeatures:
-                                   yes="true"
-                                   no="false")
+    :: use_sentence_boundaries_flag=(UseSentenceBoundaries: no="" yes="-x")
+    :: use_passthrough_grammars=(UsePassThroughGrammars: no yes)
+    :: use_ruleshape2=(UseRuleShape2: no yes)
+    :: use_ngram_features=(UseNGramFeatures: yes no)
+    :: use_source_ngram_features=(UseSourceNGramFeatures: no yes)
+    :: use_source_path_features=(UseSourcePathFeatures: yes no)
+    :: use_brown_lm=(UseBrownLM: no yes)
+    :: use_source_lm=(UseSourceLM: no yes)
+    :: source_cluster_map=@
+    :: target_cluster_map=@
     :: scfg_max_span_limit=@ 
     :: cubepruning_pop_limit=@ {
   echo "formalism=scfg" > $cdec_ini
-  echo "add_pass_through_rules=true" >> $cdec_ini 
-  echo "feature_function=KLanguageModel $use_sentence_boundaries_flag $language_model" >> $cdec_ini
+  echo "feature_function=KLanguageModel -n LanguageModel $use_sentence_boundaries_flag $language_model" >> $cdec_ini
   echo "feature_function=WordPenalty" >> $cdec_ini
-
-  # Moar features!!1
   echo "feature_function=NonLatinCount" >> $cdec_ini
   echo "feature_function=RuleShape" >> $cdec_ini
   echo "feature_function=ArityPenalty" >> $cdec_ini
-  if [[ $use_ngram_features != "false" ]]; then
-    echo "feature_function=NgramFeatures -o 2 -c $cluster_map" >> $cdec_ini
-  fi
-  if [[ $use_source_path_features != "false" ]]; then
-    echo "feature_function=SourcePathFeatures" >> $cdec_ini # Chris says to be leery of these
-  fi
-
   echo "scfg_max_span_limit=$scfg_max_span_limit" >> $cdec_ini
   echo "cubepruning_pop_limit=$cubepruning_pop_limit" >> $cdec_ini
-}
 
-task AddBrownLMToCdecIni
-    < input_cdec_ini=$cdec_ini@MakeCdecIni
-    < language_model=$language_model@CompileLanguageModel[LMType:brown]
-    :: use_sentence_boundaries_flag=(UseSentenceBoundaries:
-                                       no=""
-                                       yes="-x ")
-    :: cluster_map=@
-    > cdec_ini {
-  cp $input_cdec_ini $cdec_ini
-  echo "feature_function=KLanguageModel $use_sentence_boundaries_flag -m $cluster_map $language_model" >> $cdec_ini
+  if [[ $use_passthrough_grammars != "yes" ]]; then
+    echo "add_pass_through_rules=true" >> $cdec_ini 
+  fi
+
+  if [[ $use_ruleshape2 == "yes" ]]; then
+    echo "feature_function=RuleShape2 -f $source_cluster_map -e $target_cluster_map -p 6" >> $cdec_ini
+  fi
+
+  if [[ $use_ngram_features == "yes" ]]; then
+    echo "feature_function=NgramFeatures -x -o 2 -c $target_cluster_map" >> $cdec_ini
+  fi
+
+  if [[ $use_source_ngram_features == "yes" ]]; then
+    echo "feature_function=NgramFeatures -x -o 1 -U SCI: -c $source_cluster_map" >> $cdec_ini
+  fi
+
+  if [[ $use_source_path_features == "yes" ]]; then
+    echo "feature_function=SourcePathFeatures" >> $cdec_ini
+  fi
+
+  if [[ $use_brown_lm == "yes" ]]; then
+    echo "feature_function=KLanguageModel -n BrownLM $use_sentence_boundaries_flag -m $target_cluster_map $brown_lm" >> $cdec_ini
+  fi
+
+  if [[ $use_source_lm == "yes" ]]; then
+    echo "feature_function=KLanguageModel -n SourceLM $use_sentence_boundaries_flag $src_lm" >> $cdec_ini
+  fi
+
 }
 
 task Tune
-    < tune_set=$wrapped_corpus@ExtractGrammars[DataSection:tune]
-    < cdec_ini=(UseBrownLM:
-                  no=$cdec_ini@MakeCdecIni
-                  yes=$cdec_ini@AddBrownLMToCdecIni)
+    < tune_set=$wrapped_corpus@AddSyntheticGrammars[DataSection:tune]
+    < cdec_ini=@MakeCdecIni
     > mira_work
     > optimized_weights
+    :: metric_flag=(TuneMetric: mert="" meteor="-m meteor")
     :: cores=$decode_cores
     :: cdec_dir=@
+    :: initial_weights=@
     :: .submitter=$full_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
 
-  python $cdec_dir/training/mira/mira.py --jobs $cores --kbest-size 500 -d $tune_set -o $mira_work -c $cdec_ini --step-size 0.001 >mira_out.txt 2>mira_err.txt
+  python $cdec_dir/training/mira/mira.py --jobs $cores $metric_flag --kbest-size 500 -d $tune_set -o $mira_work -c $cdec_ini --step-size 0.001 \
+    -w $initial_weights >mira_out.txt 2>mira_err.txt
   ln -s $mira_work/weights.final $optimized_weights
 }
 
 task TuneWithMert
-    < tune_set=$wrapped_corpus@ExtractGrammars[DataSection:tune]
-    < cdec_ini=(UseBrownLM:
-                  no=$cdec_ini@MakeCdecIni
-                  yes=$cdec_ini@AddBrownLMToCdecIni)
+    < tune_set=$wrapped_corpus@AddSyntheticGrammars[DataSection:tune]
+    < cdec_ini=@MakeCdecIni
     > mert_work
     > optimized_weights
     :: cores=$decode_cores
     :: cdec_dir=@
     :: .submitter=$full_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
   initialWeights="./initialWeights.txt"
+  echo 'Arity_0 0'                        >> $initialWeights
+  echo 'Arity_1 0'                        >> $initialWeights
+  echo 'Arity_2 0'                        >> $initialWeights
   echo 'CountEF 0.19419531547'            >> $initialWeights
   echo 'EgivenFCoherent -0.143753598764'  >> $initialWeights
   echo 'Glue -0.15449154903'              >> $initialWeights
@@ -275,6 +406,45 @@ task TuneWithMert
   echo 'PassThrough_5 -0.0630230674949'   >> $initialWeights
   echo 'PassThrough_6 -0.00699001065989'  >> $initialWeights
   echo 'SampleCountF 0.0670507378596'     >> $initialWeights
+  echo 'Shape_S01010_T01010 0'            >> $initialWeights
+  echo 'Shape_S01100_T01100 0'            >> $initialWeights
+  echo 'Shape_S01100_T11000 0'            >> $initialWeights
+  echo 'Shape_S01100_T11100 0'            >> $initialWeights
+  echo 'Shape_S01110_T01011 0'            >> $initialWeights
+  echo 'Shape_S01110_T01110 0'            >> $initialWeights
+  echo 'Shape_S01110_T01111 0'            >> $initialWeights
+  echo 'Shape_S01110_T11010 0'            >> $initialWeights
+  echo 'Shape_S01110_T11011 0'            >> $initialWeights
+  echo 'Shape_S01110_T11110 0'            >> $initialWeights
+  echo 'Shape_S01110_T11111 0'            >> $initialWeights
+  echo 'Shape_S01111_T01011 0'            >> $initialWeights
+  echo 'Shape_S01111_T01110 0'            >> $initialWeights
+  echo 'Shape_S01111_T01111 0'            >> $initialWeights
+  echo 'Shape_S01111_T11010 0'            >> $initialWeights
+  echo 'Shape_S01111_T11011 0'            >> $initialWeights
+  echo 'Shape_S01111_T11110 0'            >> $initialWeights
+  echo 'Shape_S01111_T11111 0'            >> $initialWeights
+  echo 'Shape_S10000_T10000 0'            >> $initialWeights
+  echo 'Shape_S11000_T01100 0'            >> $initialWeights
+  echo 'Shape_S11000_T11000 0'            >> $initialWeights
+  echo 'Shape_S11000_T11100 0'            >> $initialWeights
+  echo 'Shape_S11100_T01100 0'            >> $initialWeights
+  echo 'Shape_S11100_T11000 0'            >> $initialWeights
+  echo 'Shape_S11100_T11100 0'            >> $initialWeights
+  echo 'Shape_S11110_T01011 0'            >> $initialWeights
+  echo 'Shape_S11110_T01110 0'            >> $initialWeights
+  echo 'Shape_S11110_T01111 0'            >> $initialWeights
+  echo 'Shape_S11110_T11010 0'            >> $initialWeights
+  echo 'Shape_S11110_T11011 0'            >> $initialWeights
+  echo 'Shape_S11110_T11110 0'            >> $initialWeights
+  echo 'Shape_S11110_T11111 0'            >> $initialWeights
+  echo 'Shape_S11111_T01011 0'            >> $initialWeights
+  echo 'Shape_S11111_T01110 0'            >> $initialWeights
+  echo 'Shape_S11111_T01111 0'            >> $initialWeights
+  echo 'Shape_S11111_T11010 0'            >> $initialWeights
+  echo 'Shape_S11111_T11011 0'            >> $initialWeights
+  echo 'Shape_S11111_T11110 0'            >> $initialWeights
+  echo 'Shape_S11111_T11111 0'            >> $initialWeights
   echo 'WordPenalty -0.0677495426343'     >> $initialWeights
 
   cp $cdec_ini ./cdec.ini
@@ -304,30 +474,28 @@ task TuneWithMert
 #}
 
 task Decode
-   < test_set=(TuneOrTest:
-       test=$wrapped_corpus@ExtractGrammars[DataSection:test]
-       tune=$wrapped_corpus@ExtractGrammars[DataSection:tune])
-   < cdec_ini=(UseBrownLM:
-		no=$cdec_ini@MakeCdecIni
-		yes=$cdec_ini@AddBrownLMToCdecIni)
-   < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert)
-   > kbest
-   > output
-   :: k=1000
-   :: cores=$decode_cores
-   :: cdec_dir=@
-   :: .submitter=$full_node_scheduler .walltime="6:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
+    < test_set=(TuneOrTest:
+        test=$wrapped_corpus@AddSyntheticGrammars[DataSection:test]
+        tune=$wrapped_corpus@AddSyntheticGrammars[DataSection:tune])
+    < cdec_ini=@MakeCdecIni
+    < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert)
+    > kbest
+    > output
+    :: k=1000
+    :: cores=$decode_cores
+    :: cdec_dir=@
+    :: .submitter=$full_node_scheduler .walltime="6:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal { 
 
- num_lines=$(cat $test_set | wc -l)
- lines_per_piece=$(echo "( $num_lines + $cores - 1 ) / $cores" | bc)
- mkdir split
- cd split
- split -a 2 -d -l $lines_per_piece $test_set "piece_"
- ls -1 piece_* | parallel -j $cores "cat {} | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > kbest_{}"
- cd ..
- echo split/kbest* | sort -n | xargs cat > $kbest
- #cat $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > $kbest
- sed 's/ ||| /\t/g' $kbest | sort -u -k 1,1 -n | cut -f 2 | sed 's/<\/\?s>//g' | sed 's/\s\+/ /g' | sed 's/^\s*\|\s*$//g' > $output
+  num_lines=$(cat $test_set | wc -l)
+  lines_per_piece=$(echo "( $num_lines + $cores - 1 ) / $cores" | bc)
+  mkdir split
+  cd split
+  split -a 2 -d -l $lines_per_piece $test_set "piece_"
+  ls -1 piece_* | parallel -j $cores "cat {} | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > kbest_{}"
+  cd ..
+  echo split/kbest* | sort -n | xargs cat > $kbest
+  #cat $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > $kbest
+  sed 's/ ||| /\t/g' $kbest | sort -u -k 1,1 -n | cut -f 2 | sed 's/<\/\?s>//g' | sed 's/\s\+/ /g' | sed 's/^\s*\|\s*$//g' > $output
 }
 
 task Evaluate 
@@ -337,7 +505,7 @@ task Evaluate
     :: multeval=@
     :: meteor_task=@
     :: meteor_lang=@
-    :: .submitter=$partial_node_scheduler .walltime="00:20:00" .cpus=1 .vmem=$tiny_task .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="00:20:00" .cpus=1 .vmem=$small_task .q=shared {
   METEORTASK=$meteor_task
   METEORLANG=$meteor_lang
   scoreFile=scores.txt
@@ -356,7 +524,10 @@ task Evaluate
 }
 
 summary EvaluationSummary {
-  of Evaluate > Score {
-    cp $bleu $Score
+  of Evaluate > Bleu Meteor TER Length {
+    cp $bleu Bleu
+    cp $meteor $Meteor
+    cp $ter $TER
+    cp $length $Length
   }
 }

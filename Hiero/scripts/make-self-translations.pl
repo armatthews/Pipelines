@@ -117,7 +117,8 @@ while(<>) {
         } else {
           my @ff=();
           push @ff, 'URL=1' if $s =~ /www|http|\.com|\.edu|\.de|\.cz|\.co\.uk|\.fr|\.es|\.org/;
-          print O "[Y] ||| $s ||| $s ||| @ff PassThrough=1\n" unless $forbid{$s};
+          print O "[X] ||| $s ||| $s ||| @ff PassThrough=1 PassThroughAsX=1\n" unless $forbid{$s};
+          print O "[Y] ||| $s ||| $s ||| @ff PassThrough=1 PassThroughAsY=1\n" unless $forbid{$s};
         }
       }
       $i++;
@@ -129,7 +130,8 @@ while(<>) {
       my $x = int(log(scalar @sl) / log(1.6) + 1);
       my @ff = ('Tagged=1');
       push @ff, 'URL=1' if $out =~ /www|http|\.com|\.edu|\.de|\.cz|\.co\.uk|\.fr|\.es|\.org/;
-      print O "[X] ||| @sl ||| $out ||| @ff TaggedLen_$x=1\n";
+      print O "[X] ||| @sl ||| $out ||| @ff TaggedLen_$x=1 TaggedAsX=1\n";
+      print O "[Y] ||| @sl ||| $out ||| @ff TaggedLen_$x=1 TaggedAsY=1\n";
       my $num="@sl";
       if ($num =~ /^[0-9,. ]+$/) {
         $num=normalize($num);
