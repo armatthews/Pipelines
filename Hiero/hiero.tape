@@ -297,8 +297,6 @@ task CompileLanguageModel
     < arpa=$language_model@BuildLanguageModel
     > language_model
     :: lm_quant_flags=@
-    :: use_custom_lm=@
-    :: custom_lm=@
     :: cdec_dir=@
     :: .submitter=$full_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$big_task .q=normal {
   $cdec_dir/klm/lm/build_binary -T . -S 90% $lm_quant_flags trie $arpa $language_model
