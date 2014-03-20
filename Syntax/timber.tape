@@ -37,7 +37,7 @@ task GrammarExtraction
     < alignment=$alignment
     > rules
     > aligns
-    :: minimalRules="false"
+    :: minimalRules=(MinimalRules: false true)
     :: maxVirtualNodeSize=(VirtualNodeSize: two=2 one=1)
     :: numCores=$grammarExtractionCores
     :: timberRoot=@
