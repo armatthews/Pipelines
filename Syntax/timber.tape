@@ -2,10 +2,10 @@
 global {
     ducttape_experimental_submitters=enable
     ducttape_experimental_imports=enable
-    #full_node_scheduler=shell
-    full_node_scheduler=torque_normal
-    #partial_node_scheduler=shell
-    partial_node_scheduler=torque_shared
+    full_node_scheduler=shell
+    #full_node_scheduler=torque_normal
+    partial_node_scheduler=shell
+    #partial_node_scheduler=torque_shared
     tiny_task=2g
     small_task=4g
     medium_task=30g
@@ -52,8 +52,12 @@ task GrammarExtraction
   split $targetTrees -l $linesPerCore -d -a 2 $tempDir/targetTrees
   split $alignment -l $linesPerCore -d -a 2 $tempDir/alignment
 
+  maxRuleSize=5
+  if [[ minimalRules ]]; then
+     maxRuleSize=1000
+  fi
   # Run each of the pieces through the rule learner in parallel
-  command="echo {} >&2; java -jar $timberRoot/grex/RuleLearner.jar $tempDir/sourceTrees{} $tempDir/targetTrees{} $tempDir/alignment{} 5 5 true false $minimalRules $maxVirtualNodeSize $tempDir/aligns{} > $tempDir/rules{}"
+  command="echo {} >&2; java -jar $timberRoot/grex/RuleLearner.jar $tempDir/sourceTrees{} $tempDir/targetTrees{} $tempDir/alignment{} $maxRuleSize $maxRuleSize true false $minimalRules $maxVirtualNodeSize $tempDir/aligns{} > $tempDir/rules{}"
   seq -f "%02g" 0 $(expr $numCores - 1) | parallel -j $numCores "$command" 
 
   # Concatenate all the outputs
