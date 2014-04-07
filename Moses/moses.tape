@@ -86,10 +86,16 @@ task CompileLanguageModel
     < arpa=$language_model@BuildLanguageModel
     > language_model
     :: lm_quant_flags=@
+    :: use_custom_lm=@
+    :: custom_lm=@
     :: moses=@
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
-  $moses/bin/build_binary $lm_quant_flags trie $arpa $language_model
+  if [[ $use_custom_lm == "true" ]]; then
+     cp $custom_lm $language_model
+  else
+     $moses/bin/build_binary $lm_quant_flags trie $arpa $language_model
+  fi
 }
 
 task LexicalProbs
