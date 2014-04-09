@@ -53,7 +53,7 @@ task GrammarExtraction
   split $alignment -l $linesPerCore -d -a 2 $tempDir/alignment
 
   maxRuleSize=5
-  if [[ minimalRules ]]; then
+  if [[ $minimalRules ]]; then
      maxRuleSize=1000
   fi
   # Run each of the pieces through the rule learner in parallel
