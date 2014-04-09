@@ -3,16 +3,16 @@
 global {
   ducttape_experimental_submitters=enable
   ducttape_experimental_imports=enable
-  full_node_scheduler=shell
-  #full_node_scheduler=torque_normal
-  partial_node_scheduler=shell
-  #partial_node_scheduler=torque_shared
+  #full_node_scheduler=shell
+  full_node_scheduler=torque_normal
+  #partial_node_scheduler=shell
+  partial_node_scheduler=torque_shared
   tiny_task=2g
   small_task=8g
   medium_task=16g
   big_task=30g
-  many_cpus=8
-  #many_cpus=32
+  #many_cpus=8
+  many_cpus=32
 }
 
 import ../submitters.tape
@@ -124,8 +124,8 @@ task ExtractPhrases
   $moses/bin/extract $target $source $alignment phrase_instances $max_phrase_length orientation --GZOutput
 
   export LC_ALL=C
-  #SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
-  SORT="sort --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  #SORT="sort --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
   zcat -f phrase_instances.gz | $SORT | gzip > phrase_instances.sorted.gz
   zcat -f phrase_instances.inv.gz | $SORT | gzip > phrase_instances.inv.sorted.gz
   zcat -f phrase_instances.o.gz | $SORT | gzip > phrase_orientations.sorted.gz
@@ -147,8 +147,8 @@ task ScorePhrases
   sort_buffer_size="1G"
 
   export LC_ALL=C
-  #SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
-  SORT="sort --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  #SORT="sort --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
 
   $SCORE $phrase_instances $lex_f2e /dev/stdout | gzip > pt.f2e.gz
   $SCORE $phrase_instances_inverse $lex_e2f /dev/stdout --Inverse | $SORT | gzip > pt.e2f.gz
