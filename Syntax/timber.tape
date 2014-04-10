@@ -53,7 +53,7 @@ task GrammarExtraction
   split $alignment -l $linesPerCore -d -a 2 $tempDir/alignment
 
   maxRuleSize=5
-  if [[ $minimalRules ]]; then
+  if [[ $minimalRules == "true" ]]; then
      maxRuleSize=1000
   fi
   # Run each of the pieces through the rule learner in parallel
@@ -463,7 +463,7 @@ task FilterToTestSet
     :: timberRoot=@
     :: scriptDir=@
     :: filtering_rarity_threshold=@
-    :: .submitter=$full_node_scheduler .walltime="72:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="12:00:00" {
   cp $scoreNames ./scoreNames
   bash $scriptDir/filtering.sh $fullGrammar $source $trainTargetTrees ./scoreNames $numCores $filteredGrammarsDir $filtering_rarity_threshold
 }
