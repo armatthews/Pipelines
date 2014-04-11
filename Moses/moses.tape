@@ -37,7 +37,7 @@ task CutTuneCorpus
   $cdec_dir/corpus/cut-corpus.pl 2 $tune_corpus > $tuneSetRefs
 }
 
-task CutTestSet
+task CutTestCorpus
     < test_corpus=@
     > testSetSource
     > testSetRefs
