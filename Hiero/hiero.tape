@@ -3,18 +3,18 @@
 global {
   ducttape_experimental_submitters=enable
   ducttape_experimental_imports=enable
-  full_node_scheduler=shell
-  #full_node_scheduler=torque_normal
-  partial_node_scheduler=shell
-  #partial_node_scheduler=torque_shared
+  #full_node_scheduler=shell
+  full_node_scheduler=torque_normal
+  #partial_node_scheduler=shell
+  partial_node_scheduler=torque_shared
   tiny_task=2g
   small_task=4g
-  medium_task=30g
-  #medium_task=32g
-  big_task=30g
-  #big_task=60g
-  many_cpus=8
-  #many_cpus=32
+  #medium_task=30g
+  medium_task=32g
+  #big_task=30g
+  big_task=60g
+  #many_cpus=8
+  many_cpus=32
 }
 
 import ../submitters.tape

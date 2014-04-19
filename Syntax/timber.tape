@@ -41,7 +41,7 @@ task GrammarExtraction
     :: maxVirtualNodeSize=(VirtualNodeSize: two=2 one=1)
     :: numCores=$grammarExtractionCores
     :: timberRoot=@
-    :: .submitter=$full_node_scheduler .walltime="01:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="02:00:00" {
   # Prepare to split the input files into chunks, one per core 
   tempDir=$(mktemp -d -p .)
   inputLineCount=$(cat $sourceTrees | wc -l)
@@ -509,7 +509,7 @@ task Tune
     :: numCores=$decodeCores
     :: timberRoot=@
     :: scriptDir=@
-    :: .submitter=$full_node_scheduler .walltime="72:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="40:00:00" {
   initialWeights="initialWeights.txt"
   wrappedDevSet="wrappedDevSet.txt"
   workDir="./mert-work"
@@ -562,7 +562,7 @@ task TuneWithMIRA
     :: numCores=$decodeCores
     :: timberRoot=@
     :: scriptDir=@
-    :: .submitter=$full_node_scheduler .walltime="72:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="40:00:00" {
   initialWeights="initialWeights.txt"
   wrappedSource="wrappedSource.txt"
   wrappedCorpus="wrappedCorpus.txt"
@@ -615,15 +615,36 @@ task Decode
                           mert=$optimizedWeights@Tune
                           mira=$optimizedWeights@TuneWithMIRA)
     > output
+    :: k=5
     :: numCores=$decodeCores
     :: timberRoot=@
     :: scriptDir=@
-    :: .submitter=$full_node_scheduler .walltime="72:00:00" {
-  wrappedSource="wrappedSource.txt" 
+    :: .submitter=$full_node_scheduler .walltime="47:00:00" {
+
+  wrappedSource="$PWD/wrappedSource.txt"
+  kbest="kbest"
   cat $testSource | python $scriptDir/wrapCorpus.py $filteredGrammarsDir > $wrappedSource
   date > timestamps.txt
-  bash $scriptDir/decode.sh $wrappedSource $cdecIni $optimizedWeights $numCores > $output
+
+  # By default we split the input file equally among all cores.
+  # We could split it into more pieces, which would decrease wait time at the end of decoding
+  # if one processor got a harder section of the file,
+  # but that would also increase the number of times we have to load the LM.
+  num_lines=$(cat $wrappedSource | wc -l)
+  lines_per_piece=$(echo "( $num_lines + $numCores - 1 ) / $numCores" | bc)
+  mkdir split
+  cd split
+  split -a 2 -d -l $lines_per_piece $wrappedSource "piece_"
+
+  ls -1 piece_* | parallel -j $numCores "cat {} | $timberRoot/cdec/corpus/cut-corpus.pl 1 | cdec -c $cdecIni -w $optimizedWeights > output_{} 2>err_{}"
+  cd ..
+  echo split/output* | sort -n | xargs cat > $output
+
   date >> timestamps.txt
+  if [[ $(cat $output | wc -l) != $(cat $testSource | wc -l) ]]; then
+    echo "ERROR: Number of lines in the output file differs from the number of lines in the input file." >&2
+    exit 1
+  fi
 }
 
 task Evaluate
