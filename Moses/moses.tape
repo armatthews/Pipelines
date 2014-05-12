@@ -3,36 +3,46 @@
 global {
   ducttape_experimental_submitters=enable
   ducttape_experimental_imports=enable
-  full_node_scheduler=shell
-  #full_node_scheduler=torque_normal
-  partial_node_scheduler=shell
-  #partial_node_scheduler=torque_shared
+  #full_node_scheduler=shell
+  full_node_scheduler=torque_normal
+  #partial_node_scheduler=shell
+  partial_node_scheduler=torque_shared
   tiny_task=2g
   small_task=8g
   medium_task=16g
   big_task=30g
-  many_cpus=8
-  #many_cpus=32
+  #many_cpus=8
+  many_cpus=32
 }
 
 import ../submitters.tape
 
-task CutCorpus
+task CutTrainCorpus
     < train_corpus=@
-    < tune_corpus=@
-    < test_corpus=@
     > source
     > target
-    > tuneSetSource
-    > tuneSetRefs
-    > testSetSource
-    > testSetRefs
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
   $cdec_dir/corpus/cut-corpus.pl 1 $train_corpus > $source
   $cdec_dir/corpus/cut-corpus.pl 2 $train_corpus > $target
+}
+
+task CutTuneCorpus
+    < tune_corpus=@
+    > tuneSetSource
+    > tuneSetRefs
+    :: cdec_dir=@
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
   $cdec_dir/corpus/cut-corpus.pl 1 $tune_corpus > $tuneSetSource
   $cdec_dir/corpus/cut-corpus.pl 2 $tune_corpus > $tuneSetRefs
+}
+
+task CutTestCorpus
+    < test_corpus=@
+    > testSetSource
+    > testSetRefs
+    :: cdec_dir=@
+    :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
   $cdec_dir/corpus/cut-corpus.pl 1 $test_corpus > $testSetSource
   $cdec_dir/corpus/cut-corpus.pl 2 $test_corpus > $testSetRefs
 }
@@ -64,7 +74,7 @@ task Symmetrize
 }
 
 task BuildLanguageModel
-    < target=@CutCorpus
+    < target=@CutTrainCorpus
     < lm_data=@
     > language_model
     :: use_custom_lm=@
@@ -74,7 +84,7 @@ task BuildLanguageModel
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   if [[ $use_custom_lm == "true" ]]; then
-     cp $custom_lm $language_model
+     ln -s $custom_lm $language_model
   else
      combined_lm_data="./combined_lm_data"
      cat $target $lm_data > $combined_lm_data
@@ -86,15 +96,21 @@ task CompileLanguageModel
     < arpa=$language_model@BuildLanguageModel
     > language_model
     :: lm_quant_flags=@
+    :: use_custom_lm=@
+    :: custom_lm=@
     :: moses=@
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
-  $moses/bin/build_binary $lm_quant_flags trie $arpa $language_model
+  if [[ $use_custom_lm == "true" ]]; then
+     ln -s $custom_lm $language_model
+  else
+     $moses/bin/build_binary $lm_quant_flags trie $arpa $language_model
+  fi
 }
 
 task LexicalProbs
-    < source=@CutCorpus
-    < target=@CutCorpus
+    < source=@CutTrainCorpus
+    < target=@CutTrainCorpus
     < alignment=@Symmetrize
     > lex_f2e=lex.f2e
     > lex_e2f=lex.e2f
@@ -104,8 +120,8 @@ task LexicalProbs
 }
 
 task ExtractPhrases
-    < source=@CutCorpus
-    < target=@CutCorpus
+    < source=@CutTrainCorpus
+    < target=@CutTrainCorpus
     < alignment=@Symmetrize
     > phrase_instances=phrase_instances.sorted.gz
     > phrase_instances_inverse=phrase_instances.inv.sorted.gz
@@ -118,8 +134,8 @@ task ExtractPhrases
   $moses/bin/extract $target $source $alignment phrase_instances $max_phrase_length orientation --GZOutput
 
   export LC_ALL=C
-  #SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
-  SORT="sort --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  #SORT="sort --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
   zcat -f phrase_instances.gz | $SORT | gzip > phrase_instances.sorted.gz
   zcat -f phrase_instances.inv.gz | $SORT | gzip > phrase_instances.inv.sorted.gz
   zcat -f phrase_instances.o.gz | $SORT | gzip > phrase_orientations.sorted.gz
@@ -141,8 +157,8 @@ task ScorePhrases
   sort_buffer_size="1G"
 
   export LC_ALL=C
-  #SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
-  SORT="sort --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  SORT="sort --parallel=$cores --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
+  #SORT="sort --buffer-size=$sort_buffer_size --temporary-directory=$PWD"
 
   $SCORE $phrase_instances $lex_f2e /dev/stdout | gzip > pt.f2e.gz
   $SCORE $phrase_instances_inverse $lex_e2f /dev/stdout --Inverse | $SORT | gzip > pt.e2f.gz
@@ -226,7 +242,7 @@ task MakeMosesIni
 
 task FilterPhraseTable
     < scored_phrase_table=@ScorePhrases
-    < source=(TuneOrTest: test=$testSetSource@CutCorpus tune=$tuneSetSource@CutCorpus)
+    < source=(TuneOrTest: test=$testSetSource@CutTestCorpus tune=$tuneSetSource@CutTuneCorpus)
     < mosesIni=@MakeMosesIni
     > filtered_pt
     > filteredMosesIni=filtered_pt/moses.ini
@@ -250,8 +266,8 @@ task BuildReorderingModel
 }
 
 task Tune
-    < src=$tuneSetSource@CutCorpus
-    < refs=$tuneSetRefs@CutCorpus
+    < src=$tuneSetSource@CutTuneCorpus
+    < refs=$tuneSetRefs@CutTuneCorpus
     < mosesIni=$filteredMosesIni@FilterPhraseTable[TuneOrTest:tune]
     > tunedMosesIni=moses.ini
     :: cores=$decode_cores
@@ -291,8 +307,8 @@ task MakeFilteredMosesIni
 task Decode
     < mosesIni=@MakeFilteredMosesIni
     < src=(TuneOrTest:
-        test=$testSetSource@CutCorpus
-        tune=$tuneSetSource@CutCorpus)
+        test=$testSetSource@CutTestCorpus
+        tune=$tuneSetSource@CutTuneCorpus)
     > output
     :: cores=$decode_cores
     :: moses=@
@@ -303,8 +319,8 @@ task Decode
 task Evaluate
     < output=$output@Decode
     < refs=(TuneOrTest:
-      test=$testSetRefs@CutCorpus
-      tune=$tuneSetRefs@CutCorpus)
+      test=$testSetRefs@CutTestCorpus
+      tune=$tuneSetRefs@CutTuneCorpus)
     > bleu meteor ter length
     :: multeval=@
     :: meteor_task=@
