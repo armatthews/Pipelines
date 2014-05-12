@@ -138,115 +138,6 @@ task MakePassThroughGrammars
     perl $script_dir/make-self-translations.pl $grammar_dir
 }
 
-task AddPassThroughGrammars
-    < in_corpus=$wrapped_corpus@ExtractGrammars
-    < grammar_dir=(UsePassThroughGrammars:
-                     no=""
-                     yes=$grammar_dir@MakePassThroughGrammars)
-    > wrapped_corpus
-    :: use_passthrough_grammars=(UsePassThroughGrammars: no yes)
-    :: script_dir=@ {
-  if [[ $use_passthrough_grammars == "yes" ]]; then
-    pv $in_corpus | python $script_dir/add_passthrough_grammars.py "pt" "$grammar_dir" > $wrapped_corpus
-  else
-    cp $in_corpus $wrapped_corpus
-  fi
-}
-
-task FindOOVs
-    < corpus=$wrapped_corpus@ExtractGrammars
-    > oovs
-    :: script_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=1 .vmem=$medium_task .q=shared {
-  pv $corpus | python $script_dir/find_oovs.py > $oovs
-}
-
-# TODO: We should generate the labels, weights, and charlm to make this more general
-task MakeTranslitGrammars
-    < oovs=@FindOOVs
-    > translit_grammar
-    :: translit_dir=@
-    :: translit_labels=@
-    :: translit_weights=@
-    :: translit_charlm=@
-    :: translit_kbest=@
-    :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=1 .vmem=$medium_task .q=shared {
-  python $translit_dir/translit-oovs.py \
-    -cdec ~/git/timber/cdec \
-    -transliterator $translit_dir \
-    -labels $translit_labels \
-    -weights $translit_weights \
-    -oov $oovs \
-    -kbest $translit_kbest \
-    -charlm $translit_charlm \
-    -grammar $translit_grammar
-}
-
-task AddTranslitGrammars
-    < in_corpus=$wrapped_corpus@AddPassThroughGrammars
-    < translit_grammar=(UseTranslitGrammars:
-                          no=""
-                          yes=$translit_grammar@MakeTranslitGrammars)
-    > wrapped_corpus
-    :: use_translit_grammars=(UseTranslitGrammars: no yes)
-    :: script_dir=@ {
-  if [[ $use_translit_grammars == "yes" ]]; then
-    pv $in_corpus | python $script_dir/add_translit_grammar.py "$translit_grammar" > $wrapped_corpus
-  else
-    cp $in_corpus $wrapped_corpus
-  fi
-}
-
-task AddNEGrammar
-    < in_corpus=$wrapped_corpus@AddTranslitGrammars
-    < ne_grammar=@
-    > wrapped_corpus
-    :: use_ne_grammar=(UseNEGrammar: no yes)
-    :: script_dir=@ {
-  if [[ $use_ne_grammar == "yes" ]]; then
-    pv $in_corpus | python $script_dir/add_translit_grammar.py "$ne_grammar" > $wrapped_corpus
-  else
-    cp $in_corpus $wrapped_corpus
-  fi
-}
-
-task AddAvneeshGrammar
-    < in_corpus=$wrapped_corpus@AddNEGrammar
-    < avneesh_grammar=@
-    > wrapped_corpus
-    :: use_avneesh_grammar=(UseAvneeshGrammar: no yes)
-    :: script_dir=@ {
-  if [[ $use_aveneesh_grammar == "yes" ]]; then
-    pv $in_corpus | python $script_dir/add_translit_grammar.py "$avneesh_grammar" > $wrapped_corpus
-  else
-    cp $in_corpus $wrapped_corpus
-  fi
-}
-
-task MakeSyntheticGrammars
-    < in_grammar_dir=$grammar_dir@ExtractGrammars
-    > grammar_dir
-    :: .submitter=$full_node_scheduler .walltime="4:00:00" .cpus=2 .vmem=$big_task .q=normal {
-  bash /oasis/projects/nsf/cmu126/armatthe/wmt14/run.sh $in_grammar_dir ./yulia_dir
-  ln -s ./yulia_dir/grammars $grammar_dir
-}
-
-task AddSyntheticGrammars
-    < in_corpus=$wrapped_corpus@AddAvneeshGrammar
-    < grammar_dir=(UseSyntheticGrammars:
-                     no=""
-                     yes=$grammar_dir@MakeSyntheticGrammars)
-    > wrapped_corpus
-    :: use_synthetic_grammars=(UseSyntheticGrammars: no yes)
-    :: script_dir=@ {
-  if [[ $use_synthetic_grammars == "yes" ]]; then
-    pv $in_corpus | python $script_dir/add_passthrough_grammars.py "grammar" "$grammar_dir" > $wrapped_corpus
-  else
-    cp $in_corpus $wrapped_corpus
-  fi
-}
-
 task LMBrownClusters
     < lm_data=@
     < corpus=$train_corpus
@@ -310,9 +201,9 @@ task MakeCdecIni
     :: use_sentence_boundaries_flag=(UseSentenceBoundaries: no="" yes="-x")
     :: use_passthrough_grammars=(UsePassThroughGrammars: no yes)
     :: use_ruleshape2=(UseRuleShape2: no yes)
-    :: use_ngram_features=(UseNGramFeatures: yes no)
+    :: use_ngram_features=(UseNGramFeatures: no yes)
     :: use_source_ngram_features=(UseSourceNGramFeatures: no yes)
-    :: use_source_path_features=(UseSourcePathFeatures: yes no)
+    :: use_source_path_features=(UseSourcePathFeatures: no yes)
     :: use_brown_lm=(UseBrownLM: no yes)
     :: use_source_lm=(UseSourceLM: no yes)
     :: source_cluster_map=@
@@ -359,26 +250,26 @@ task MakeCdecIni
 }
 
 task Tune
-    < tune_set=$wrapped_corpus@AddSyntheticGrammars[DataSection:tune]
+    < tune_set=$wrapped_corpus@ExtractGrammars[DataSection:tune]
     < cdec_ini=@MakeCdecIni
     > mira_work
     > optimized_weights
-    :: metric_flag=(TuneMetric: mert="" meteor="-m meteor")
+    :: metric_flag=(TuneMetric: bleu=" " meteor="-m meteor --no-pseudo --sent-approx")
     :: cores=$decode_cores
-    :: cdec_dir=@
-    :: initial_weights=@
+    :: cdec_dir=@ 
     :: .submitter=$full_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
 
   python $cdec_dir/training/mira/mira.py --jobs $cores $metric_flag --kbest-size 500 -d $tune_set -o $mira_work -c $cdec_ini --step-size 0.001 \
-    -w $initial_weights >mira_out.txt 2>mira_err.txt
+    >mira_out.txt 2>mira_err.txt
   ln -s $mira_work/weights.final $optimized_weights
 }
 
 task TuneWithMert
-    < tune_set=$wrapped_corpus@AddSyntheticGrammars[DataSection:tune]
+    < tune_set=$wrapped_corpus@ExtractGrammars[DataSection:tune]
     < cdec_ini=@MakeCdecIni
     > mert_work
     > optimized_weights
+    :: metric_flag=(TuneMetric: bleu=" " meteor="--metric meteor")
     :: cores=$decode_cores
     :: cdec_dir=@
     :: .submitter=$full_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
@@ -448,33 +339,14 @@ task TuneWithMert
   cp $cdec_ini ./cdec.ini
   echo 'density_prune=100.0' >> cdec.ini
 
-  perl $cdec_dir/training/dpmert/dpmert.pl --devset $tune_set --weights $initialWeights --jobs $cores --output-dir $mert_work --config ./cdec.ini
+  perl $cdec_dir/training/dpmert/dpmert.pl $metric_flag --devset $tune_set --weights $initialWeights --jobs $cores --output-dir $mert_work --config ./cdec.ini
   ln -s $mert_work/weights.final $optimized_weights
 }
 
-#task OldDecode
-#    < test_set=(TuneOrTest:
-#        test=$wrapped_corpus@ExtractGrammars[DataSection:test]
-#        tune=$wrapped_corpus@ExtractGrammars[DataSection:tune])
-#    < cdec_ini=(UseBrownLM:
-#                  no=$cdec_ini@MakeCdecIni
-#                  yes=$cdec_ini@AddBrownLMToCdecIni) 
-#    < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert)
-#    > kbest
-#    > output
-#    :: k=1000
-#    :: cores=$decode_cores
-#    :: cdec_dir=@
-#    :: .submitter=$full_node_scheduler .walltime="6:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
-#
-#  cat $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > $kbest
-#  sed 's/ ||| /\t/g' $kbest | sort -u -k 1,1 -n | cut -f 2 > $output
-#}
-
 task Decode
     < test_set=(TuneOrTest:
-        test=$wrapped_corpus@AddSyntheticGrammars[DataSection:test]
-        tune=$wrapped_corpus@AddSyntheticGrammars[DataSection:tune])
+        test=$wrapped_corpus@ExtractGrammars[DataSection:test]
+        tune=$wrapped_corpus@ExtractGrammars[DataSection:tune])
     < cdec_ini=@MakeCdecIni
     < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert)
     > kbest
