@@ -51,7 +51,7 @@ task AlignS2T
     < corpus=$train_corpus
     > alignment
     :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$big_task .q=shared {
   $cdec_dir/word-aligner/fast_align -i $corpus -d -v -o > $alignment
 }
 
@@ -59,7 +59,7 @@ task AlignT2S
     < corpus=$train_corpus
     > alignment
     :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="12:00:00" .cpus=1 .vmem=$big_task .q=shared {
   $cdec_dir/word-aligner/fast_align -i $corpus -d -v -o -r > $alignment
 }
 
@@ -67,10 +67,10 @@ task Symmetrize
     < s2tAlignment=$alignment@AlignS2T
     < t2sAlignment=$alignment@AlignT2S
     > alignment
-    :: symmetrization_heuristic=@
+    :: heuristic=(AlignSym: gdfa="grow-diag-final-and" gd="grow-diag")
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
-  $cdec_dir/utils/atools -i $s2tAlignment -j $t2sAlignment -c $symmetrization_heuristic > $alignment
+  $cdec_dir/utils/atools -i $s2tAlignment -j $t2sAlignment -c $heuristic > $alignment
 }
 
 task BuildLanguageModel
