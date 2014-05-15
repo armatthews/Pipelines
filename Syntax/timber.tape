@@ -71,8 +71,21 @@ task GrammarExtraction
 #  rm -rf $tempDir 
 }
 
+task HyperGraphGrammarExtraction
+    < sourceTrees=$sourceTrees
+    < targetTrees=$targetTrees
+    < alignment=$alignment
+    > rules
+    :: hg_rule_extractor=@
+    :: source_k=(SourceKBest: 1 10)
+    :: target_k=(TargetKBest: 1 10)
+    :: numCores=$grammarExtractionCores {
+  #pypy $hg_rule_extractor -k $sourceTrees $targetTrees $alignment > $rules
+  echo "hello, world"
+}
+
 task CollectNonTerminalCounts
-    < rules=@GrammarExtraction
+    < rules=(UseHGRuleLearner: no=$rules@GrammarExtraction yes=$rules@HyperGraphGrammarExtraction)
     > ntCounts
     :: scriptDir=@
     :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$medium_task {
@@ -80,7 +93,7 @@ task CollectNonTerminalCounts
 }
 
 task ConvertGrammarFormat
-    < rules=@GrammarExtraction
+    < rules=(UseHGRuleLearner: no=$rules@GrammarExtraction yes=$rules@HyperGraphGrammarExtraction)
     > grammar
     > scoreNames
     :: scriptDir=@
@@ -205,7 +218,7 @@ task ScoreSourceLGR
     :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   cp $inputScoreNames $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 4,4 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 4,4 --parallel=$sortCores > $sortedGrammar 
   pv $sortedGrammar | perl $timberRoot/grascore/score-wide-slhs-given-srhs.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
   rm $sortedGrammar
@@ -259,7 +272,7 @@ task ScoreTargetRGL
     :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   cp $inputScoreNames $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,3 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,3 --parallel=$sortCores > $sortedGrammar 
   pv $sortedGrammar | perl $timberRoot/grascore/score-wide-trhs-given-tlhs.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
   rm $sortedGrammar
@@ -277,7 +290,7 @@ task ScoreRuleSGT
     :: .submitter=$full_node_scheduler .walltime="24:00:00" {
   sortedGrammar="./sorted"
   cp $inputScoreNames $scoreNames
-  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,3 -k 5,5 --parallel=$sortCores > $sortedGrammar
+  pv $grammar | LC_ALL=C sort -S $sortRAM -T $sortTempDir -t $'\t' -k 3,3 -k 5,5 --parallel=$sortCores > $sortedGrammar 
   pv $sortedGrammar | perl $timberRoot/grascore/score-wide-cfg-sgt.pl $scoreNames > $scoredGrammar
   mv $scoreNames.new $scoreNames
   rm $sortedGrammar
@@ -531,8 +544,10 @@ task Tune
   cat ./DevSet | python $scriptDir/wrapCorpus.py $filteredGrammarsDir > $wrappedDevSet
   perl $timberRoot/cdec/training/dpmert/dpmert.pl --devset $wrappedDevSet --weights $initialWeights --jobs $numCores --output-dir $workDir --config $cdecIni
 
-  index=$(ls $workDir | grep '^weights\.[0-9]*$' | sed 's/^weights\.//' | sort -n | tail -n 1)
-  ln -s $workDir/weights.$index $optimizedWeights
+  if [[ "$?" == 0 ]]; then
+    index=$(ls $workDir | grep '^weights\.[0-9]*$' | sed 's/^weights\.//' | sort -n | tail -n 1)
+    ln -s $workDir/weights.$index $optimizedWeights
+  fi
 }
 
 task TuneWithMIRA
@@ -603,13 +618,13 @@ task Decode
                           mert=$optimizedWeights@Tune
                           mira=$optimizedWeights@TuneWithMIRA)
     > output
-    :: k=5
+    :: k=1
     :: numCores=$decodeCores
     :: timberRoot=@
     :: scriptDir=@
-    :: .submitter=$full_node_scheduler .walltime="47:00:00" {
+    :: .submitter=$full_node_scheduler .walltime="72:00:00" {
 
-  wrappedSource="$PWD/wrappedSource.txt"
+  wrappedSource="$PWD/wrappedSource.txt" 
   kbest="kbest"
   cat $testSource | python $scriptDir/wrapCorpus.py $filteredGrammarsDir > $wrappedSource
   date > timestamps.txt
@@ -627,7 +642,6 @@ task Decode
   ls -1 piece_* | parallel -j $numCores "cat {} | $timberRoot/cdec/corpus/cut-corpus.pl 1 | cdec -c $cdecIni -w $optimizedWeights > output_{} 2>err_{}"
   cd ..
   echo split/output* | sort -n | xargs cat > $output
-
   date >> timestamps.txt
   if [[ $(cat $output | wc -l) != $(cat $testSource | wc -l) ]]; then
     echo "ERROR: Number of lines in the output file differs from the number of lines in the input file." >&2
@@ -660,7 +674,10 @@ task Evaluate
 }
 
 summary EvaluationSummary {
-  of Evaluate > Score {
-    cp $bleu $Score
+  of Evaluate > Bleu Meteor TER Length {
+    cp $bleu Bleu
+    cp $meteor $Meteor
+    cp $ter $TER
+    cp $length $Length
   }
 }

@@ -23,7 +23,7 @@ global {
    numCores=1
    filteringCores=32
    grammarExtractionCores=32
-   decodeCores=12
+   decodeCores=8
    sortCores=32
 
    timberRoot="/home/armatthe/git/timber-branch"

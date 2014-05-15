@@ -1,6 +1,6 @@
 global {
    # Output directory:
-   ducttape_output="/home/armatthe/Research/Systems/FBIS-NewCdec/"
+   ducttape_output="/home/armatthe/Research/Systems/FBIS-HGRuleLearner2/ducttape"
 
    # Input data files:
         source="/home/armatthe/Research/FBIS/source.txt"
@@ -19,17 +19,22 @@ global {
 
    # Parameters:
    # Note: small LM wants "ASCII" quotes, but large LM wants ``LaTeX'' quotes
+   # Also: small LM wants normal "()" parens, but large LM wants "-LRB-" and "-RRB-"
    languageModel=(LM:
                     small="/oasis/projects/nsf/cmu126/ghannema/lms/c2e.3gram.trie"
                     large="/oasis/projects/nsf/cmu126/ghannema/lms/fbis-gigaword-fix.5.trie")
 
+   # No: use the old rule learner
+   # Yes: use the HG rule learner, but with only 1 tree per side
+   # hg: use the HG rule learner, with 10 trees on each side
    filteringCores=32
    grammarExtractionCores=32
-   decodeCores=12
+   decodeCores=8
    sortCores=32
 
-   timberRoot="/home/armatthe/git/timber-branch"
-   scriptDir="/home/armatthe/git/timber-branch/timber_scripts"
+   timberRoot="/home/armatthe/git/timber"
+   scriptDir="/home/armatthe/git/timber/timber_scripts"
+   hg_rule_extractor=""
    tuningRunNumber=(TuningRunNumber: 1..3)
 
    meteor_task="rank"
@@ -38,9 +43,18 @@ global {
    sortRAM="20G"
    sortTempDir="."
 
-   filtering_rarity_threshold=0.3776
+   # Rarity = [e^(1/count)-1] / (e-1), 2 = 0.3776 20 = 0.0299, 50 = 0.01176
+   filtering_rarity_threshold=(RarityThreshold: default=0.3776 none=10000)
 }
 
 plan Full {
-  reach Evaluate via (TuneOrTest: test tune) * (PickTestSet: mt03 mt08) * (Optimizer: mira) * (TuningRunNumber: 1) * (LM: large) * (UseNewFeatures: yes)
+  reach Evaluate via (TuneOrTest: test tune) * (PickTestSet: mt03 mt08) * (Optimizer: mert) * (TuningRunNumber: 1..3) * (LM: large) * (VirtualNodeSize: one) * (UseHGRuleLearner: no) * (RarityThreshold: none)
+  reach Evaluate via (TuneOrTest: test tune) * (PickTestSet: mt03 mt08) * (Optimizer: mert) * (TuningRunNumber: 1..3) * (LM: large) * (VirtualNodeSize: one) * (UseHGRuleLearner: yes) * (SourceKBest: 1) * (TargetKBest: 1) * (RarityThreshold: none)
+  reach Evaluate via (TuneOrTest: test tune) * (PickTestSet: mt03 mt08) * (Optimizer: mert) * (TuningRunNumber: 1..3) * (LM: large) * (VirtualNodeSize: one) * (UseHGRuleLearner: yes) * (SourceKBest: 1) * (TargetKBest: 10) * (RarityThreshold: none)
+  reach Evaluate via (TuneOrTest: test tune) * (PickTestSet: mt03 mt08) * (Optimizer: mert) * (TuningRunNumber: 1..3) * (LM: large) * (VirtualNodeSize: one) * (UseHGRuleLearner: yes) * (SourceKBest: 10) * (TargetKBest: 1) * (RarityThreshold: none)
+  reach Evaluate via (TuneOrTest: test tune) * (PickTestSet: mt03 mt08) * (Optimizer: mert) * (TuningRunNumber: 1..3) * (LM: large) * (VirtualNodeSize: one) * (UseHGRuleLearner: yes) * (SourceKBest: 10) * (TargetKBest: 10) * (RarityThreshold: none)
+}
+
+plan gwar {
+  reach Evaluate via (TuneOrTest: test) * (PickTestSet: mt08) * (Optimizer: mert) * (TuningRunNumber: 3) * (LM: large) * (VirtualNodeSize: one) * (UseHGRuleLearner: yes) * (SourceKBest: 10) * (TargetKBest: 10) * (RarityThreshold: none)
 }
