@@ -180,6 +180,8 @@ task CompileLanguageModel
     :: .submitter=$partial_node_scheduler .walltime="06:00:00" .cpus=1 .vmem=$medium_task .q=shared {
  if [[ $use_custom_lm == "true" ]]; then
      ln -s $custom_lm $language_model
+ elif [[ -z $lm_quant_flags ]]; then
+     $cdec_dir/klm/lm/build_binary trie $arpa $language_model
  else
      $cdec_dir/klm/lm/build_binary $lm_quant_flags trie $arpa $language_model
  fi
