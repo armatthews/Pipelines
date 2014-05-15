@@ -1,0 +1,31 @@
+global {
+  # Output directory:
+  ducttape_output="/usr2/home/austinma/Systems/FBIS-t2s/"
+
+  train_corpus="/usr0/home/austinma/git/Pipelines/TreeToString/data/fbis.zhen"
+  tune_corpus="/usr0/home/austinma/git/Pipelines/TreeToString/data/mt06.zhen"
+  test_corpus=(PickTestSet: mt03="/usr0/home/austinma/git/Pipelines/TreeToString/data/mt03.zhen"
+			    mt08="/usr0/home/austinma/git/Pipelines/TreeToString/data/mt08.zhen")
+
+  language_model="/usr2/home/austinma/Systems/tree-to-string/fbis-gigaword-fix.5.trie"
+}
+
+global {
+  decode_cores=16
+
+  meteor_task="rank"
+  meteor_lang="en"
+
+  cdec_dir="/home/austinma/git/timber/cdec/"
+  scriptDir="/usr0/home/austinma/git/timber/timber_scripts"
+  grammar_extractor_dir="/home/austinma/git/HyperGrex"
+  multeval="/home/austinma/git/timber/multeval/multeval.sh"
+
+}
+
+plan Full {
+  reach Evaluate via (TuneOrTest: test tune) * (PickTestSet: mt03 mt08) * (Optimizer: mira mert)
+}
+plan NonMinimal {
+  reach Evaluate via (TuneOrTest: test tune) * (PickTestSet: mt03 mt08) * (Optimizer: mira mert) * (MinimalRules: no)
+}
