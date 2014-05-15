@@ -39,9 +39,10 @@ task Symmetrize
     < s2tAlignment=$alignment@AlignS2T
     < t2sAlignment=$alignment@AlignT2S
     > alignment
+    :: heuristic=(AlignSym: gdfa="grow-diag-final-and" gd="grow-diag")
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
-  $cdec_dir/utils/atools -i $s2tAlignment -j $t2sAlignment -c grow-diag-final-and > $alignment
+  $cdec_dir/utils/atools -i $s2tAlignment -j $t2sAlignment -c $heuristic > $alignment
 }
 
 task AddSentenceBoundaryTags
@@ -92,7 +93,7 @@ task ExtractGrammars
     > grammar_dir
     :: cores=1
     :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="24:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="48:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   export PYTHONPATH=`echo $cdec_dir/python/build/lib.*`
   cat $corpus | python -m cdec.sa.extract -c $ini -g $grammar_dir -j $cores -z > $wrapped_corpus
 }
@@ -164,7 +165,7 @@ task BuildLanguageModel
      corpus_target="./corpus_target"
      $cdec_dir/corpus/cut-corpus.pl 2 $corpus > $corpus_target
      zcat -f $lm_data >> $corpus_target
-     $cdec_dir/../mosesdecoder/bin/lmplz --order $lm_order -T . -S 10% < $corpus_target > $language_model
+     $cdec_dir/klm/lm/builder/lmplz --order $lm_order -T . -S 10% < $corpus_target > $language_model
      rm $corpus_target
   fi
 }
@@ -322,7 +323,7 @@ task Evaluate
     :: multeval=@
     :: meteor_task=@
     :: meteor_lang=@
-    :: .submitter=$partial_node_scheduler .walltime="00:20:00" .cpus=1 .vmem=$tiny_task .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="00:20:00" .cpus=1 .vmem=$medium_task .q=shared {
   METEORTASK=$meteor_task
   METEORLANG=$meteor_lang
   scoreFile=scores.txt
