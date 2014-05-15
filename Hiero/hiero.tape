@@ -39,9 +39,10 @@ task Symmetrize
     < s2tAlignment=$alignment@AlignS2T
     < t2sAlignment=$alignment@AlignT2S
     > alignment
+    :: heuristic=(AlignSym: gdfa="grow-diag-final-and" gd="grow-diag")
     :: cdec_dir=@
     :: .submitter=$partial_node_scheduler .walltime="01:00:00" .cpus=1 .vmem=$tiny_task .q=shared {
-  $cdec_dir/utils/atools -i $s2tAlignment -j $t2sAlignment -c grow-diag-final-and > $alignment
+  $cdec_dir/utils/atools -i $s2tAlignment -j $t2sAlignment -c $heuristic > $alignment
 }
 
 task AddSentenceBoundaryTags
@@ -92,7 +93,7 @@ task ExtractGrammars
     > grammar_dir
     :: cores=1
     :: cdec_dir=@
-    :: .submitter=$partial_node_scheduler .walltime="24:00:00" .cpus=1 .vmem=$medium_task .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="48:00:00" .cpus=1 .vmem=$medium_task .q=shared {
   export PYTHONPATH=`echo $cdec_dir/python/build/lib.*`
   cat $corpus | python -m cdec.sa.extract -c $ini -g $grammar_dir -j $cores -z > $wrapped_corpus
 }
@@ -164,7 +165,7 @@ task BuildLanguageModel
      corpus_target="./corpus_target"
      $cdec_dir/corpus/cut-corpus.pl 2 $corpus > $corpus_target
      zcat -f $lm_data >> $corpus_target
-     $cdec_dir/../mosesdecoder/bin/lmplz --order $lm_order -T . -S 10% < $corpus_target > $language_model
+     $cdec_dir/klm/lm/builder/lmplz --order $lm_order -T . -S 10% < $corpus_target > $language_model
      rm $corpus_target
   fi
 }
@@ -187,16 +188,16 @@ task CompileLanguageModel
 task MakeCdecIni
     < language_model=$language_model@CompileLanguageModel[LMType:surface]
     > cdec_ini
-    :: cluster_map=@
-    :: use_sentence_boundaries_flag=(UseSentenceBoundaries:
-                                       no=""
-                                       yes="-x ")
-    :: use_ngram_features=(UseNGramFeatures:
-                             yes="true"
-                             no="false")
-    :: use_source_path_features=(UseSourcePathFeatures:
-                                   yes="true"
-                                   no="false")
+    :: use_sentence_boundaries_flag=(UseSentenceBoundaries: no="" yes="-x")
+    :: use_passthrough_grammars=(UsePassThroughGrammars: no yes)
+    :: use_ruleshape2=(UseRuleShape2: no yes)
+    :: use_ngram_features=(UseNGramFeatures: no yes)
+    :: use_source_ngram_features=(UseSourceNGramFeatures: no yes)
+    :: use_source_path_features=(UseSourcePathFeatures: no yes)
+    :: use_brown_lm=(UseBrownLM: no yes)
+    :: use_source_lm=(UseSourceLM: no yes)
+    :: source_cluster_map=@
+    :: target_cluster_map=@
     :: scfg_max_span_limit=@ 
     :: cubepruning_pop_limit=@ {
   echo "formalism=scfg" > $cdec_ini
@@ -238,11 +239,14 @@ task Tune
                   yes=$cdec_ini@AddBrownLMToCdecIni)
     > mira_work
     > optimized_weights
+    :: metric_flag=(TuneMetric: bleu=" " meteor="-m meteor --no-pseudo --sent-approx")
     :: cores=$decode_cores
-    :: cdec_dir=@
+    :: cdec_dir=@ 
     :: .submitter=$full_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
 
-  python $cdec_dir/training/mira/mira.py --jobs $cores --kbest-size 500 -d $tune_set -o $mira_work -c $cdec_ini --step-size 0.001 >mira_out.txt 2>mira_err.txt
+  python $cdec_dir/training/mira/mira.py --jobs $cores $metric_flag --kbest-size 500 -d $tune_set -o $mira_work -c $cdec_ini --step-size 0.001 \
+    >mira_out.txt 2>mira_err.txt
+
   ln -s $mira_work/weights.final $optimized_weights
 }
 
@@ -253,6 +257,7 @@ task TuneWithMert
                   yes=$cdec_ini@AddBrownLMToCdecIni)
     > mert_work
     > optimized_weights
+    :: metric_flag=(TuneMetric: bleu=" " meteor="--metric meteor")
     :: cores=$decode_cores
     :: cdec_dir=@
     :: .submitter=$full_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
@@ -280,54 +285,35 @@ task TuneWithMert
   cp $cdec_ini ./cdec.ini
   echo 'density_prune=100.0' >> cdec.ini
 
-  perl $cdec_dir/training/dpmert/dpmert.pl --devset $tune_set --weights $initialWeights --jobs $cores --output-dir $mert_work --config ./cdec.ini
+  perl $cdec_dir/training/dpmert/dpmert.pl $metric_flag --devset $tune_set --weights $initialWeights --jobs $cores --output-dir $mert_work --config ./cdec.ini
   ln -s $mert_work/weights.final $optimized_weights
 }
 
-#task OldDecode
-#    < test_set=(TuneOrTest:
-#        test=$wrapped_corpus@ExtractGrammars[DataSection:test]
-#        tune=$wrapped_corpus@ExtractGrammars[DataSection:tune])
-#    < cdec_ini=(UseBrownLM:
-#                  no=$cdec_ini@MakeCdecIni
-#                  yes=$cdec_ini@AddBrownLMToCdecIni) 
-#    < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert)
-#    > kbest
-#    > output
-#    :: k=1000
-#    :: cores=$decode_cores
-#    :: cdec_dir=@
-#    :: .submitter=$full_node_scheduler .walltime="6:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
-#
-#  cat $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > $kbest
-#  sed 's/ ||| /\t/g' $kbest | sort -u -k 1,1 -n | cut -f 2 > $output
-#}
-
 task Decode
-   < test_set=(TuneOrTest:
-       test=$wrapped_corpus@ExtractGrammars[DataSection:test]
-       tune=$wrapped_corpus@ExtractGrammars[DataSection:tune])
-   < cdec_ini=(UseBrownLM:
-		no=$cdec_ini@MakeCdecIni
-		yes=$cdec_ini@AddBrownLMToCdecIni)
-   < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert)
-   > kbest
-   > output
-   :: k=1000
-   :: cores=$decode_cores
-   :: cdec_dir=@
-   :: .submitter=$full_node_scheduler .walltime="6:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
+    < test_set=(TuneOrTest:
+        test=$wrapped_corpus@ExtractGrammars[DataSection:test]
+        tune=$wrapped_corpus@ExtractGrammars[DataSection:tune])
+    < cdec_ini=(UseBrownLM:
+        no=$cdec_ini@MakeCdecIni
+        yes=$cdec_ini@AddBrownLMToCdecIni)
+    < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert)
+    > kbest
+    > output
+    :: k=1000
+    :: cores=$decode_cores
+    :: cdec_dir=@
+    :: .submitter=$full_node_scheduler .walltime="6:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
 
- num_lines=$(cat $test_set | wc -l)
- lines_per_piece=$(echo "( $num_lines + $cores - 1 ) / $cores" | bc)
- mkdir split
- cd split
- split -a 2 -d -l $lines_per_piece $test_set "piece_"
- ls -1 piece_* | parallel -j $cores "cat {} | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > kbest_{}"
- cd ..
- echo split/kbest* | sort -n | xargs cat > $kbest
- #cat $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > $kbest
- sed 's/ ||| /\t/g' $kbest | sort -u -k 1,1 -n | cut -f 2 | sed 's/<\/\?s>//g' | sed 's/\s\+/ /g' | sed 's/^\s*\|\s*$//g' > $output
+  num_lines=$(cat $test_set | wc -l)
+  lines_per_piece=$(echo "( $num_lines + $cores - 1 ) / $cores" | bc)
+  mkdir split
+  cd split
+  split -a 2 -d -l $lines_per_piece $test_set "piece_"
+  ls -1 piece_* | parallel -j $cores "cat {} | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > kbest_{}"
+  cd ..
+  echo split/kbest* | sort -n | xargs cat > $kbest
+  #cat $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | cdec -c $cdec_ini -w $weights -k $k -r > $kbest
+  sed 's/ ||| /\t/g' $kbest | sort -u -k 1,1 -n | cut -f 2 | sed 's/<\/\?s>//g' | sed 's/\s\+/ /g' | sed 's/^\s*\|\s*$//g' > $output
 }
 
 task Evaluate 
@@ -337,7 +323,7 @@ task Evaluate
     :: multeval=@
     :: meteor_task=@
     :: meteor_lang=@
-    :: .submitter=$partial_node_scheduler .walltime="00:20:00" .cpus=1 .vmem=$tiny_task .q=shared {
+    :: .submitter=$partial_node_scheduler .walltime="00:20:00" .cpus=1 .vmem=$medium_task .q=shared {
   METEORTASK=$meteor_task
   METEORLANG=$meteor_lang
   scoreFile=scores.txt

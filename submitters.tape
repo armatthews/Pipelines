@@ -11,7 +11,7 @@ submitter torque_normal :: walltime
     echo "#PBS -j oe" >> $wrapper
     echo "#PBS -o localhost:$PWD/ducttape_job_out.txt" >> $wrapper
     echo "#PBS -e localhost:$PWD/ducttape_job_err.txt" >> $wrapper
-    echo "#PBS -N $CONFIGURATION/$TASK/$REALIZATION" >> $wrapper
+    echo "#PBS -N $(echo $CONFIGURATION/$TASK/$REALIZATION | head -c200)" >> $wrapper
 
     echo "#PBS -m bea" >> $wrapper
     echo "#PBS -V" >> $wrapper
@@ -69,7 +69,7 @@ submitter torque_shared :: walltime cpus vmem
     echo "#PBS -j oe" >> $wrapper
     echo "#PBS -o localhost:$PWD/ducttape_job_out.txt" >> $wrapper
     echo "#PBS -e localhost:$PWD/ducttape_job_err.txt" >> $wrapper
-    echo "#PBS -N $CONFIGURATION/$TASK/$REALIZATION" >> $wrapper
+    echo "#PBS -N $(echo $CONFIGURATION/$TASK/$REALIZATION | head -c200)" >> $wrapper
 
     echo "#PBS -m bea" >> $wrapper
     echo "#PBS -V" >> $wrapper
