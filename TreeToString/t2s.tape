@@ -98,9 +98,9 @@ task ScoreGrammar
     < e2f=@LexicalProbs
     < f2e=@LexicalProbs
     > scored_grammar {
-  pv $grammar | sed 's/ ||| /\t/g' | sort -k 1,4 | sed 's/\t/ ||| /g' | python /usr0/home/austinma/git/grascore-t2s/collect_rule_counts.py > tmp1
-  pv tmp1 | sed 's/ ||| /\t/g' | sort -k 1,1 | sed 's/\t/ ||| /g' | python /usr0/home/austinma/git/grascore-t2s/score_phrase_sgt.py 2,2 1,1 -n phrase_tgs > tmp2
-  pv tmp2 | sed 's/ ||| /\t/g' | sort -k 2,2 | sed 's/\t/ ||| /g' | python /usr0/home/austinma/git/grascore-t2s/score_phrase_sgt.py 1,1 2,2 -n phrase_sgt > tmp3
+  pv $grammar | sed 's/ ||| /\t/g' | LC_ALL=C sort -k 1,4 -t $'\t' | sed 's/\t/ ||| /g' | python /usr0/home/austinma/git/grascore-t2s/collect_rule_counts.py > tmp1
+  pv tmp1 | sed 's/ ||| /\t/g' | LC_ALL=C sort -k 1,1 -t $'\t' | sed 's/\t/ ||| /g' | python /usr0/home/austinma/git/grascore-t2s/score_phrase_sgt.py 2,2 1,1 -n phrase_tgs > tmp2
+  pv tmp2 | sed 's/ ||| /\t/g' | LC_ALL=C sort -k 2,2 -t $'\t' | sed 's/\t/ ||| /g' | python /usr0/home/austinma/git/grascore-t2s/score_phrase_sgt.py 1,1 2,2 -n phrase_sgt > tmp3
   pv tmp3 | python /usr0/home/austinma/git/grascore-t2s/score_lex_probs.py $e2f $f2e -n lex_sgt -m lex_tgs > tmp4
   pv tmp4 | python /usr0/home/austinma/git/grascore-t2s/log_feats.py -r > $scored_grammar
 }
@@ -108,12 +108,14 @@ task ScoreGrammar
 task MakeCdecIni
     < scored_grammar=@ScoreGrammar
     < language_model=@
-    > cdec_ini {
+    > cdec_ini
+    :: pop_limit=@ {
   echo "formalism=t2s" > $cdec_ini
   echo "add_pass_through_rules=true" >> $cdec_ini 
   echo "feature_function=KLanguageModel $language_model" >> $cdec_ini
   echo "feature_function=WordPenalty" >> $cdec_ini 
   echo "grammar=$scored_grammar" >> $cdec_ini
+  echo "cubepruning_pop_limit=$pop_limit" >> $cdec_ini
 
   # Do these work in t2s?
   #echo "feature_function=NonLatinCount" >> $cdec_ini
@@ -131,8 +133,22 @@ task Tune
     :: cdec_dir=@
     :: .submitter=$full_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
 
-  python $cdec_dir/training/mira/mira.py --jobs $cores --kbest-size 500 -d $tune_set -o $mira_work -c $cdec_ini --step-size 0.001 -w /usr2/home/austinma/Systems/FBIS-t2s/TuneWithMert/Baseline.baseline/mert_work/weights.final >mira_out.txt 2>mira_err.txt
+  python $cdec_dir/training/mira/mira.py --jobs $cores --kbest-size 500 -d $tune_set -o $mira_work -c $cdec_ini --step-size 0.001 -w /usr0/home/austinma/git/Pipelines/TreeToString/weights.final >mira_out.txt 2>mira_err.txt
   ln -s $mira_work/weights.final $optimized_weights
+}
+
+task TuneWithPro
+    < tune_set=$tune_corpus
+    < cdec_ini=@MakeCdecIni
+    > pro_work
+    > optimized_weights
+    :: cores=$decode_cores
+    :: cdec_dir=@
+    :: .submitter=$full_node_scheduler .walltime="48:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
+  initialWeights="./initialWeights.txt"
+  echo "Glue 0" >> $initialWeights
+  perl $cdec_dir/training/pro/pro.pl --weights $initialWeights --config $cdec_ini --devset $tune_set --output-dir $pro_work --jobs $cores
+  ln -s $pro_work/weights.final $optimized_weights
 }
 
 task TuneWithMert
@@ -152,9 +168,6 @@ task TuneWithMert
   echo 'log_phrase_sgt 1.81'  >> $initialWeights
   echo 'log_phrase_tgs 2.91'  >> $initialWeights
   echo 'PassThrough 0.861338' >> $initialWeights
-  echo 'PassThrough:FW 0.861338' >> $initialWeights
-  echo 'PassThrough_Lexical 0.861338' >> $initialWeights
-  echo 'PassThrough:PU 0.861338' >> $initialWeights
   echo 'rarity -0.07'         >> $initialWeights
   echo 'WordPenalty -1'       >> $initialWeights
 
@@ -170,7 +183,7 @@ task Decode
         test=$test_corpus
         tune=$tune_corpus)
     < cdec_ini=@MakeCdecIni
-    < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert)
+    < weights=(Optimizer: mira=$optimized_weights@Tune mert=$optimized_weights@TuneWithMert pro=$optimized_weights@TuneWithPro)
     > kbest
     > output
     :: k=1000
@@ -209,7 +222,10 @@ task Evaluate
 }
 
 summary EvaluationSummary {
-  of Evaluate > Score {
-    cp $bleu $Score
+  of Evaluate > Bleu Meteor TER Length {
+    cp $bleu Bleu
+    cp $meteor $Meteor
+    cp $ter $TER
+    cp $length $Length
   }
 }
