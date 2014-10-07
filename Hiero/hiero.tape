@@ -3,10 +3,10 @@
 global {
   ducttape_experimental_submitters=enable
   ducttape_experimental_imports=enable
-  #full_node_scheduler=shell
-  full_node_scheduler=torque_normal
-  #partial_node_scheduler=shell
-  partial_node_scheduler=torque_shared
+  full_node_scheduler=shell
+  #full_node_scheduler=torque_normal
+  partial_node_scheduler=shell
+  #partial_node_scheduler=torque_shared
   tiny_task=2g
   small_task=4g
   #medium_task=30g
@@ -130,14 +130,14 @@ task MakeGlueGrammars
 task LMBrownClusters
     < lm_data=@
     < corpus=$train_corpus
-    < cluster_map=@
+    < target_cluster_map=@
     > out_lm_data
     > out_corpus
     :: cdec_dir=@
     :: script_dir=@
     :: .submitter=$partial_node_scheduler .walltime="4:00:00" .cpus=2 .vmem=$medium_task .q=shared {
-  zcat -f $lm_data | python $script_dir/map_clusters.py $cluster_map | gzip > $out_lm_data
-  zcat -f $corpus | $cdec_dir/corpus/cut-corpus.pl 2 | python $script_dir/map_clusters.py $cluster_map > ./out_corpus_tgt
+  zcat -f $lm_data | python $script_dir/map_clusters.py $target_cluster_map | gzip > $out_lm_data
+  zcat -f $corpus | $cdec_dir/corpus/cut-corpus.pl 2 | python $script_dir/map_clusters.py $target_cluster_map > ./out_corpus_tgt
 
   # Repackage the test corpus as a parallel corpus, as the BuildLanguageModel expects one
   $cdec_dir/corpus/paste-files.pl <(zcat -f $corpus | $cdec_dir/corpus/cut-corpus.pl 1) ./out_corpus_tgt > $out_corpus
@@ -212,7 +212,7 @@ task MakeCdecIni
   echo "feature_function=RuleShape" >> $cdec_ini
   echo "feature_function=ArityPenalty" >> $cdec_ini
   if [[ $use_ngram_features != "false" ]]; then
-    echo "feature_function=NgramFeatures -o 2 -c $cluster_map" >> $cdec_ini
+    echo "feature_function=NgramFeatures -o 2 -c $target_cluster_map" >> $cdec_ini
   fi
   if [[ $use_source_path_features != "false" ]]; then
     echo "feature_function=SourcePathFeatures" >> $cdec_ini # Chris says to be leery of these
@@ -228,10 +228,10 @@ task AddBrownLMToCdecIni
     :: use_sentence_boundaries_flag=(UseSentenceBoundaries:
                                        no=""
                                        yes="-x ")
-    :: cluster_map=@
+    :: target_cluster_map=@
     > cdec_ini {
   cp $input_cdec_ini $cdec_ini
-  echo "feature_function=KLanguageModel $use_sentence_boundaries_flag -m $cluster_map $language_model" >> $cdec_ini
+  echo "feature_function=KLanguageModel $use_sentence_boundaries_flag -m $target_cluster_map $language_model" >> $cdec_ini
 }
 
 task Tune
