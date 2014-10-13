@@ -1,0 +1,20 @@
+global {
+  # Output directory:
+  ducttape_output="/usr2/home/austinma/FBIS-OxLM-Model"
+
+  train_source="/home/austinma/FBIS/source.txt"
+  train_target="/home/austinma/FBIS/target.txt"
+  dev_source="/home/austinma/FBIS/TestSets/mt06/source.txt"
+  dev_target="/home/austinma/FBIS/TestSets/mt06/target.txt.0"
+}
+
+global {
+  cores=24
+  cdec_dir="/home/austinma/git/timber/cdec/"
+  oxlm_dir="/home/austinma/git/OxLM2/"
+  wcluster_path="/home/austinma/git/brown-cluster/wcluster"
+}
+
+plan Full {
+  reach BuildModel
+}
