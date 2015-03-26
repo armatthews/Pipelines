@@ -20,7 +20,7 @@ for i, line in enumerate(grammar_file):
 print >>sys.stderr
 print >>sys.stderr, 'Reading dev set...'
 for line in sys.stdin:
-	source, target = line.decode('utf-8').strip().split('\t')
+	source, target = line.decode('utf-8').strip().split('\t', 1)
 	source = source.strip().split()
 	for word in source:
 		if word not in vocab:

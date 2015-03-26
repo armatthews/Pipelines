@@ -20,11 +20,16 @@ def levenshtein(seq1, seq2):
 
 sent_count = 0
 total_errors = 0
-for hyp, ref in zip(open(args.hyps), open(args.refs)):
+for hyp, refs in zip(open(args.hyps), open(args.refs)):
 	hyp = hyp.strip().split()
-	ref = ref.strip().split()
-	errors = levenshtein(hyp, ref)
-	total_errors += errors
+	min_errors = sys.maxint
+	for ref in refs.split('\t'):
+		ref = ref.strip().split()
+		errors = levenshtein(hyp, ref)
+		if errors < min_errors:
+			min_errors = errors
+	assert min_errors != sys.maxint
+	total_errors += min_errors
 	sent_count += 1
 
 print 1.0 * total_errors / sent_count

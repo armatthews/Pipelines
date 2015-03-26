@@ -1,11 +1,11 @@
 #!/usr/bin/env ducttape
 
 global {
-  ducttape_output="/usr3/home/austinma/Systems/compounds-test-lower2"
-  #ducttape_output="/usr3/home/eschling/german/compounds-test-dir"
+  ducttape_output="/home/austinma/Systems/compounds-test-lower2"
+  #ducttape_output="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/compounds-test-dir"
   cdec_dir="/home/austinma/git/cdec"
   script_dir="/home/austinma/git/Pipelines/CompoundGenerator/scripts"
-  tag_english_script="/usr3/home/eschling/german/pos_tag.py"
+  tag_english_script="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/pos_tag.py"
 }
 
 global {
@@ -13,25 +13,25 @@ global {
   parallel_data="/usr0/home/austinma/compounds/wood_german/filtered.en-de.tok.lower"
   source_trees="/usr0/home/austinma/compounds/wood_german/trees.gz"
 
-  train_compounds="/usr3/home/eschling/german/train.compound.txt"
+  train_compounds="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/train.compound.txt"
   dev_compounds=(TuningSet:
-    dev="/usr3/home/eschling/german/dev.compound.txt"
-    train="/usr3/home/eschling/german/train.compound.txt")
-  test_compounds="/usr3/home/eschling/german/test.compound.txt"
+    dev="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/dev.compound.txt"
+    train="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/train.compound.txt")
+  test_compounds=(TestSet:
+    bitext="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/test.compound.txt"
+    isabl="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/isabelle/test.txt")
 
   length_limit=3
 }
 
 plan All {
-    reach MakePassthroughGrammar, Latticify via (DecodeSet: test tune train)
-    reach EvaluateReachability via (DecodeSet: test tune) * (POSLatticeFeatures: no yes)
-    reach EvaluateCER, EvaluateMRR, EvaluateReachability via (DecodeSet: test tune) * (POSLatticeFeatures: no yes)
-    reach EvaluateCER, EvaluateMRR, EvaluateReachability via (DecodeSet: test tune) * (POSLatticeFeatures: yes) * (TuningSet: train)
+    #reach EvaluateCER, EvaluateMRR, EvaluateReachability via (DecodeSet: test tune) * (POSLatticeFeatures: no yes)
+    reach EvaluateCER, EvaluateMRR, EvaluateReachability via (DecodeSet: test tune) * (POSLatticeFeatures: yes) * (TuningSet: train) * (TestSet: bitext isabl) * (TuningIterations: 10)
 }
 
-plan TestTag {
-    reach Latticify via (DecodeSet: tune) * (POSLatticeFeatures: yes no)
-}
+#plan TestTag {
+#    reach Latticify via (DecodeSet: tune) * (POSLatticeFeatures: yes no)
+#}
 
 # Prerequisites
 task CompoundSplit
@@ -163,6 +163,7 @@ task MakeCdecIni
   echo "grammar=$suf_grammar" >> $cdec_ini
   echo "grammar=$pt_grammar" >> $cdec_ini
   echo "cubepruning_pop_limit=1000" >> $cdec_ini
+  echo "feature_function=WordPenalty" >> $cdec_ini
 }
 
 task POSTagEnglish
@@ -187,21 +188,25 @@ task Latticify
   :: length_limit=@ {
   pos_flag=""
   if [ -f $decode_pos ]; then
-    pos_flag="--pos $decode_pos"
+    pos_flag="--pos ./pos"
   fi
-  zcat -f $decode_set | awk -F ' ' "NF - 1 <= $length_limit" | gzip > ./temp
-  paste <(zcat -f ./temp | cut -f 1 | python $script_dir/latticify.py $pos_flag) <(zcat -f ./temp | cut -f 2 | python $script_dir/space.py) | sed 's/\t/ ||| /g' | gzip > $lattice_set
+  paste <(zcat -f $decode_set) <(zcat -f $decode_pos) | awk -F $'\t' '{n = split($1, a, " "); if (n <= '"$length_limit"') { print $0; }}' > x
+  cat x | cut -f 1,2 | gzip > ./temp.gz
+  cat x | cut -f 3 > ./pos
+  zcat -f $decode_set | awk -F $'\t' '{n = split($1, a, " "); if (n <= '"$length_limit"') { print $0; }}' | gzip > ./temp.gz
+  paste <(zcat -f ./temp.gz | cut -f 1 | python $script_dir/latticify.py $pos_flag) <(zcat -f ./temp | cut -f 2 | python $script_dir/space.py) | sed 's/\t/ ||| /g' | gzip > $lattice_set
 }
 
 task Tune
   < lattice_set=@Latticify[DecodeSet:dev]
   < cdec_ini=@MakeCdecIni[DecodeSet:dev]
   > weights
-  :: cores=8
+  :: cores=40
   :: tuning_metric="wer"
-  :: cdec_dir=@ {
-  #ulimit -v 1000000000
-  /usr/bin/python $cdec_dir/training/mira/mira.py -m $tuning_metric -j $cores -c $cdec_ini -d <(zcat -f $lattice_set) -o mira_work --max-iterations 4 -w ~/weights.1
+  :: cdec_dir=@
+  :: iterations=(TuningIterations: 5 10 15) {
+  ulimit -v 1000000000
+  /usr/bin/python $cdec_dir/training/mira/mira.py -m $tuning_metric -j $cores -c $cdec_ini -d <(zcat -f $lattice_set) -o mira_work --max-iterations $iterations 
   ln -s mira_work/weights.final $weights
 }
 
@@ -211,11 +216,11 @@ task Decode
   < weights=@Tune
   > kbest
   > output
-  :: cores=8
+  :: cores=40
   :: kbest_size=1000
   :: cdec_dir=@ {
   zcat $lattice_set | $cdec_dir/corpus/cut-corpus.pl 1 | ~/Tools/embarrassingly_parallel.sh $cores $cdec_dir/decoder/cdec -w $weights -c $cdec_ini -k $kbest_size -r > $kbest
-  sed 's/ ||| /\t/g' $kbest | sort -u -k 1,1 -n | cut -f 2 | sed 's/<\/\?s>//g' | sed 's/\s\+/ /g' | sed 's/^\s*\|\s*$//g' > $output
+  sed 's/ ||| /\t/g' $kbest | awk 'BEGIN {p=-1;} {if($1 != p) { print $0;} p = $1; }' | cut -f 2 | sed 's/<\/\?s>//g' | sed 's/\s\+/ /g' | sed 's/^\s*\|\s*$//g' > $output
 }
 
 task EvaluateCER
@@ -234,7 +239,7 @@ task EvaluateMRR
   > mrr
   :: script_dir=@
   :: length_limit=@ {
-  zcat -f $test_set | awk -F ' ' "NF - 1 <= $length_limit" | cut -f 2 | python $script_dir/space.py > ./refs
+  zcat -f $test_set | awk -F $'\t' '{n = split($1, a, " "); if (n <= '"$length_limit"') { print $0; }}' | cut -f 2- | python $script_dir/space.py > ./refs
   cat $hyps | python $script_dir/mrr.py ./refs > mrr
   rm ./refs
 }
@@ -244,7 +249,7 @@ task EvaluateReachability
   < weights=@Tune
   < cdec_ini=@MakeCdecIni
   > reachability
-  :: cores=8
+  :: cores=40
   :: cdec_dir=@ {
 
   cat $cdec_ini | sed '/^\s*feature_function\s*=\s*KLanguageModel\s/d' > ./cdec_ini

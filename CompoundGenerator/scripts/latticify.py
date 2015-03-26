@@ -70,8 +70,8 @@ def compute_path_features(original, words, dropped_words, permutation, pos=False
         drop_lex = '_'.join(sorted([getword(w) for w in dropped_words]))
         drop_count = 0
 	pos_drop_count = defaultdict(int)
-        drop_index = '_'.join(sorted([getindex(w) for w in dropped_words]))
-	keep_index = '_'.join(sorted([getindex(words[ind]) for ind in permutation]))
+        drop_index = '_'.join([getindex(w) for w in dropped_words])
+	keep_index = '_'.join([getindex(words[ind]) for ind in permutation])
 	for word, count in dropped_words.iteritems():
 		features['drop_lex_%s' % getword(word)] = count
                 drop_count += count
@@ -96,7 +96,8 @@ def compute_path_features(original, words, dropped_words, permutation, pos=False
 	features['drop_index_path_'+drop_index] = 1.0
         keep_lex = '_'.join([getword(words[ind]) for ind in permutation])
 	features['keep_lex_'+keep_lex] = 1.0
-        features['keep_index_'+'_'.join([str(ind) for ind in permutation])] = 1.0
+        features['keep_index_'+keep_index] = 1.0
+        features['index_path_keep_'+keep_index+'_drop_'+drop_index] = 1.0
 
 	monotonic = True
 	for i in range(1, len(permutation)):
@@ -182,6 +183,7 @@ for line in sys.stdin:
         if args.pos:
 		pos_line = pos_file.readline().strip()
 		tags = [pos for pos in pos_line.split() if len(pos) > 0]
+                assert(len(tags) == len(words))
 		words = zip(words, tags)
 	word_counter = Counter(words)
 	lattice = Lattice()
