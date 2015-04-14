@@ -1,0 +1,13 @@
+global {
+  ducttape_output="/home/austinma/Systems/compounds_fi"
+  parallel_data="/usr0/home/austinma/git/Pipelines/CompoundGenerator/finnish/parallel.enfi.gz"
+  source_trees="/dev/null"
+
+  train_compounds="/usr0/home/austinma/git/Pipelines/CompoundGenerator/finnish/train_compounds.gz"
+  dev_compounds="/usr0/home/austinma/git/Pipelines/CompoundGenerator/finnish/train_compounds.gz"
+  test_compounds="/dev/null"
+}
+
+plan All {
+    reach EvaluateCER, EvaluateMRR, EvaluateReachability via (TuningIterations: 2) * (LengthLimit: 5) * (POSLatticeFeatures: yes) * (DecodeSet: test dev)
+}

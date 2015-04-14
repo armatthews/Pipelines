@@ -1,0 +1,22 @@
+global {
+  ducttape_output="/home/austinma/Systems/compounds-test-lower"
+
+  #parallel_data="/usr0/home/austinma/compounds/wood_german/filtered.en-de.tok"
+  parallel_data="/usr0/home/austinma/compounds/wood_german/filtered.en-de.tok.lower"
+  source_trees="/usr0/home/austinma/compounds/wood_german/trees.gz"
+
+  train_compounds="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/train.compound.txt"
+  dev_compounds=(TuningSet:
+    dev="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/dev.compound.txt"
+    train="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/train.compound.txt")
+  test_compounds=(TestSet:
+    bitext="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/test.compound.txt"
+    isabl="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/isabelle/test.txt"
+    oracle="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/oracle-experiment.txt")
+}
+
+plan All {
+    #reach EvaluateCER, EvaluateMRR, EvaluateReachability via (DecodeSet: test tune) * (POSLatticeFeatures: no yes)
+    reach EvaluateCER, EvaluateMRR, EvaluateReachability via (DecodeSet: test tune) * (POSLatticeFeatures: yes) * (TuningSet: train) * (TestSet: bitext isabl oracle) * (TuningIterations: 10) * (PruneSuffixes: yes) * (PruneGrammar: yes) * (LengthLimit: 5)
+}
+

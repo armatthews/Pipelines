@@ -1,37 +1,12 @@
 #!/usr/bin/env ducttape
 
 global {
-  ducttape_output="/home/austinma/Systems/compounds-test-lower2"
   #ducttape_output="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/compounds-test-dir"
   cdec_dir="/home/austinma/git/cdec"
   script_dir="/home/austinma/git/Pipelines/CompoundGenerator/scripts"
-  tag_english_script="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/pos_tag.py"
+
+  length_limit=(LengthLimit: 5) 
 }
-
-global {
-  #parallel_data="/usr0/home/austinma/compounds/wood_german/filtered.en-de.tok"
-  parallel_data="/usr0/home/austinma/compounds/wood_german/filtered.en-de.tok.lower"
-  source_trees="/usr0/home/austinma/compounds/wood_german/trees.gz"
-
-  train_compounds="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/train.compound.txt"
-  dev_compounds=(TuningSet:
-    dev="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/dev.compound.txt"
-    train="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/train.compound.txt")
-  test_compounds=(TestSet:
-    bitext="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/test.compound.txt"
-    isabl="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/isabelle/test.txt")
-
-  length_limit=3
-}
-
-plan All {
-    #reach EvaluateCER, EvaluateMRR, EvaluateReachability via (DecodeSet: test tune) * (POSLatticeFeatures: no yes)
-    reach EvaluateCER, EvaluateMRR, EvaluateReachability via (DecodeSet: test tune) * (POSLatticeFeatures: yes) * (TuningSet: train) * (TestSet: bitext isabl) * (TuningIterations: 10)
-}
-
-#plan TestTag {
-#    reach Latticify via (DecodeSet: tune) * (POSLatticeFeatures: yes no)
-#}
 
 # Prerequisites
 task CompoundSplit
@@ -126,10 +101,17 @@ task MakeCdecGrammar
   < forward_ttable=$ttable@Align[Direction:forward,CompoundSplit:yes] 
   < reverse_ttable=$ttable@Align[Direction:reverse,CompoundSplit:yes]
   > grammar=grammar.gz
+  :: prune=(PruneGrammar: no yes)
   :: script_dir=@ {
   zcat -f $forward_ttable | LC_ALL=C sort -k 1,1 -k 2,2 -t ' ' > fwd
   zcat -f $reverse_ttable | LC_ALL=C sort -k 2,2 -k 1,1 -t ' ' > rev
   python $script_dir/convert_ttable.py fwd rev | gzip > $grammar
+
+  if [[ $prune == "yes" ]]; then
+    zcat $grammar | perl /usr0/home/cdyer/projects/compounds/clean-featurify.pl /usr0/home/cdyer/projects/compounds/50mpaths2.gz | gzip -9 > fixed-grammar.gz
+    mv fixed-grammar.gz $grammar
+  fi
+
   rm fwd
   rm rev
 }
@@ -147,8 +129,13 @@ task MakePassthroughGrammar
 task MakeSuffixGrammar
   < analyses=@AnalyzeCompounds
   > grammar=grammar.gz
+  :: prune=(PruneSuffixes: no yes)
   :: script_dir=@ {
   zcat -f $analyses | python $script_dir/build_suffix_table.py | gzip > $grammar
+  if [[ $prune == "yes" ]]; then
+    zcat $grammar | egrep 'fwd=-[012345]\.' | gzip -9 > better-suffix-grammar.gz
+    mv better-suffix-grammar.gz $grammar
+  fi
 }
 
 task MakeCdecIni
@@ -171,8 +158,8 @@ task POSTagEnglish
       test=$test_compounds
       dev=$dev_compounds)
   > pos
-  :: tag_english_script=@ {
-  cat $decode_set | $tag_english_script > $pos
+  :: script_dir=@ {
+  zcat -f $decode_set | python $script_dir/pos_tag.py > $pos
 }
 
 task Latticify
@@ -192,7 +179,7 @@ task Latticify
   fi
   paste <(zcat -f $decode_set) <(zcat -f $decode_pos) | awk -F $'\t' '{n = split($1, a, " "); if (n <= '"$length_limit"') { print $0; }}' > x
   cat x | cut -f 1,2 | gzip > ./temp.gz
-  cat x | cut -f 3 > ./pos
+  cat x | rev | cut -f 1 | rev > ./pos
   zcat -f $decode_set | awk -F $'\t' '{n = split($1, a, " "); if (n <= '"$length_limit"') { print $0; }}' | gzip > ./temp.gz
   paste <(zcat -f ./temp.gz | cut -f 1 | python $script_dir/latticify.py $pos_flag) <(zcat -f ./temp | cut -f 2 | python $script_dir/space.py) | sed 's/\t/ ||| /g' | gzip > $lattice_set
 }
@@ -204,7 +191,7 @@ task Tune
   :: cores=40
   :: tuning_metric="wer"
   :: cdec_dir=@
-  :: iterations=(TuningIterations: 5 10 15) {
+  :: iterations=(TuningIterations: 5 10 15 1 2) {
   ulimit -v 1000000000
   /usr/bin/python $cdec_dir/training/mira/mira.py -m $tuning_metric -j $cores -c $cdec_ini -d <(zcat -f $lattice_set) -o mira_work --max-iterations $iterations 
   ln -s mira_work/weights.final $weights
@@ -227,8 +214,9 @@ task EvaluateCER
   < test_set=$test_compounds
   < hyps=$output@Decode
   > cer
+  :: length_limit=@
   :: script_dir=@ {
-  cut -f 2 $test_set | python $script_dir/space.py > ./refs
+  zcat -f $test_set | awk -F $'\t' '{n = split($1, a, " "); if (n <= '"$length_limit"') { print $0; }}' | cut -f 2- | python $script_dir/space.py | sed 's/ *\t */\t/g' > ./refs
   python $script_dir/cer.py $hyps ./refs > cer
   rm ./refs
 }
