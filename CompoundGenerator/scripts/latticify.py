@@ -2,6 +2,7 @@ import sys
 import argparse
 import codecs
 import itertools
+from math import log, floor
 from collections import defaultdict, Counter, namedtuple
 
 LatticeEdge = namedtuple('LatticeEdge', 'to_node, label, features')
@@ -66,7 +67,7 @@ def compute_path_features(original, words, dropped_words, permutation, pos=False
 		if pos: return str(w[0][0])
 		else: return str(w[0])
 
-	features = {}
+	features = defaultdict(float)
         drop_lex = '_'.join(sorted([getword(w) for w in dropped_words]))
         drop_count = 0
 	pos_drop_count = defaultdict(int)
@@ -74,11 +75,14 @@ def compute_path_features(original, words, dropped_words, permutation, pos=False
 	keep_index = '_'.join([getindex(words[ind]) for ind in permutation])
 	for word, count in dropped_words.iteritems():
 		features['drop_lex_%s' % getword(word)] = count
+		loglen = int(log(len(getword(word))) / log(1.6))
+		features['drop_wordlen_%d' % loglen] += 1
                 drop_count += count
 		if pos:
 			pos_drop_count[word[1]] += count
 
 	features['drop_count'] = drop_count
+	features['drop_%d_words' % drop_count] = 1.0
         for tag in pos_drop_count:
 		features['drop_pos_%s' % tag] = pos_drop_count[tag]
 
@@ -157,21 +161,30 @@ def add_lattice_path(original, lattice, words, dropped_words, permutation, pos=F
 		lattice.add_edge(prev_state, next_state, word, features)
 		if i != len(permutation) - 1:
 			lattice.add_edge(prev_state, next_state + 1, word, features)
-			if pos:	features = compute_edge_features(word, tag, suff=True)
-			else:	features = compute_edge_features(word, suff=True)
-			lattice.add_edge(next_state, next_state + 1, '<suf>', features)
+			if not args.no_sufs:
+				if pos:	features = compute_edge_features(word, tag, suff=True)
+				else:	features = compute_edge_features(word, suff=True)
+				lattice.add_edge(next_state, next_state + 1, '<suf>', features)
 		if i == len(permutation) - 1:
-			final_edges.append((prev_state, word, features))	
-			if pos:	features = compute_edge_features(word, tag, suff=True)
-			else:	features = compute_edge_features(word, suff=True)
-			final_edges.append((next_state, '<end>', features))
+			final_edges.append((prev_state, word, features))
+			if not args.no_ends:
+				if pos:	features = compute_edge_features(word, tag, suff=True)
+				else:	features = compute_edge_features(word, suff=True)
+				final_edges.append((next_state, '<end>', features))
 		prev_state = next_state + 1
 
 	return final_edges
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-p', '--pos', help='File containing pos tagged input')
+parser.add_argument('--no_sufs', help='Disable medial suffixes in lattices', action='store_true')
+parser.add_argument('--no_ends', help='Disable final suffixes in lattices', action='store_true')
+parser.add_argument('--keep_content', help='Don\'t allow dropping of content words', action='store_true')
 args = parser.parse_args()
+
+if args.keep_content and not args.pos:
+	print >>sys.stderr, '--keep_content flag requires --pos to be set'
+	sys.exit(1)
 
 if args.pos:
   pos_file = open(args.pos)
@@ -192,6 +205,14 @@ for line in sys.stdin:
 	valid_word_sets = [word_set for word_set in powerset(words) if len(word_set) >= 2]
 	for word_set in valid_word_sets:
 		dropped_words = word_counter - Counter(word_set)
+		if args.keep_content:
+			valid = True
+			for word, pos in dropped_words:
+				if pos in 'NN NNS JJ VBG VBD RB VBP VBN VBZ VB JJR JJS RBR RBS NNP CD'.split():
+					valid = False
+					break
+			if not valid:
+				continue
 		for permutation in itertools.permutations(range(len(word_set))):
 			features = defaultdict(float)
 			final_edges += add_lattice_path(
