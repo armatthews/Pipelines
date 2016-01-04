@@ -1,0 +1,46 @@
+global {
+    # Output directory:
+    ducttape_output="/usr3/home/austinma/Systems/enus-dede-compounds-baseline/ducttape"
+
+    train_corpus="/usr0/home/austinma/decompounds/parallel.tc.ende"
+    tune_corpus="/usr0/home/austinma/decompounds/test_sets/tune.ende"
+    test_corpus="/usr0/home/austinma/decompounds/test_sets/devtest.ende"
+
+    target_monolingual_data="/usr4/home/austinma/decompounds/mono.de"
+
+    alignment="/usr0/home/austinma/decompounds/parallel.tc.ende.gd"
+
+    language_model="/usr0/home/austinma/decompounds/de4.klm"
+    brown_language_model="/dev/null"
+    oxlm_language_model="/dev/null"
+    oxlm_flags=""
+
+    source_cluster_map="/dev/null"
+    target_cluster_map="/dev/null"
+}
+
+global {
+    decode_cores=32
+    scfg_max_span_limit=12
+    cubepruning_pop_limit=200
+
+    meteor_task="li"
+    meteor_lang="fi"
+
+    script_dir="/home/austinma/git/Pipelines/Hiero/scripts"
+    cdec_dir="/home/austinma/git/timber/cdec/"
+    brown_cluster_dir="/home/austinma/git/brown-cluster"
+    multeval="/home/austinma/git/timber/multeval/multeval.sh"
+    oxlm_module_path="/dev/null"
+    compound_grammar=(TuneOrTest:
+      test=(UseSyntheticCompounds:
+        no="/dev/null"
+        yes="")
+      tune=(UseSyntheticCompounds:
+        no="/dev/null"
+        yes="/usr0/home/austinma/decompounds/test_sets/tune.compounds.gr.gz"))
+}
+
+plan Full {
+    reach Tune via (TuneOrTest: test tune) * (Optimizer: mira) * (DataSection: tune test) * (UseSyntheticCompounds: no yes)
+}

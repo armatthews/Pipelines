@@ -1,0 +1,39 @@
+global {
+    # Output directory:
+    ducttape_output="/usr3/home/austinma/Systems/enus-fifi-compounds-baseline/ducttape"
+
+    train_corpus="/home/austinma/ficompounds/parallel.enfi.filt.tok"
+    tune_corpus="/home/austinma/ficompounds/test_sets/dev.enfi.tok"
+    test_corpus="/home/austinma/ficompounds/test_sets/devtest.enfi.tok"
+
+    target_monolingual_data="/usr0/home/austinma/ficompounds/mono.fi.tok.gz"
+
+    alignment="/home/austinma/ficompounds/parallel.enfi.filt.tok.gd"
+
+    language_model="/usr0/home/austinma/ficompounds/fi4.klm"
+    brown_language_model="/dev/null"
+    oxlm_language_model="/dev/null"
+    oxlm_flags=""
+
+    source_cluster_map="/dev/null"
+    target_cluster_map="/dev/null"
+}
+
+global {
+    decode_cores=32
+    scfg_max_span_limit=12
+    cubepruning_pop_limit=200
+
+    meteor_task="li"
+    meteor_lang="fi"
+
+    script_dir="/home/austinma/git/Pipelines/Hiero/scripts"
+    cdec_dir="/home/austinma/git/timber/cdec/"
+    brown_cluster_dir="/home/austinma/git/brown-cluster"
+    multeval="/home/austinma/git/timber/multeval/multeval.sh"
+    oxlm_module_path="/dev/null"
+}
+
+plan Full {
+    reach Evaluate via (TuneOrTest: test tune) * (Optimizer: mira) * (DataSection: tune test)
+}
