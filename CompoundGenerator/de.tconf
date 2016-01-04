@@ -1,0 +1,29 @@
+global {
+  ducttape_output="/home/austinma/Systems/compounds_de"
+  #ducttape_output="/home/austinma/Systems/compounds-test-lower2"
+
+  #parallel_data="/usr0/home/austinma/compounds/wood_german/filtered.en-de.tok"
+  parallel_data="/usr0/home/austinma/compounds/wood_german/filtered.en-de.tok.lower"
+  source_trees="/usr0/home/austinma/compounds/wood_german/trees.gz"
+
+  train_compounds="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/train.compound.txt"
+  dev_compounds=(TuningSet:
+    dev="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/dev.compound.txt"
+    train="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/train.compound.txt"
+    tinyfake="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/tiny_fake_dev.gz")
+  test_compounds=(TestSet:
+    bitext="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/test.compound.txt.lower"
+    isabl="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/isabelle/test.txt.lower"
+    oracle="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/oracle-experiment.txt.lower"
+    tune="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/TestSets/tune.ende.compounds"
+    devtest="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/TestSets/devtest.ende.compounds"
+    test2014="/usr0/home/austinma/git/Pipelines/CompoundGenerator/german/TestSets/test2014.tok.tc.compounds" )
+
+  brown_clusters="/usr0/home/cdyer/projects/compounds/50mpaths2.gz"
+  tuning_run=(TuningRun: 1 2 3)
+}
+
+plan All {
+#    reach Evaluate via (POSLatticeFeatures: yes) * (TuningSet: train) * (TuningIterations: 10) * (PruneSuffixes: yes) * (PruneGrammar: yes) * (LengthLimit: 5) * (TuningRun: 1) * (DecodeSet: test dev) * (TestSet: bitext isabl oracle) * (BanContentDropping: no yes cd)
+    reach Decode via (POSLatticeFeatures: yes) * (TuningSet: train) * (TuningIterations: 10) * (PruneSuffixes: yes) * (PruneGrammar: yes) * (LengthLimit: 5) * (TuningRun: 1) * (DecodeSet: test dev) * (TestSet: tune devtest test2014) * (BanContentDropping: cd)
+}

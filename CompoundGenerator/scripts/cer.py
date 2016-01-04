@@ -32,4 +32,7 @@ for hyp, refs in zip(open(args.hyps), open(args.refs)):
 	total_errors += min_errors
 	sent_count += 1
 
-print 1.0 * total_errors / sent_count
+if sent_count > 0:
+	print 1.0 * total_errors / sent_count
+else:
+	print 0.0

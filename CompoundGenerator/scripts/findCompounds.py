@@ -109,6 +109,17 @@ for line in sys.stdin:
 		if not valid:
 			continue
 
+		rev_aligned_words = [j for (i, j) in alignment if i >= min_i and i <= max_i]
+		valid = True
+		for j in rev_aligned_words:
+			if word != '-' and j != t:
+				valid = False
+			elif word == '-' and j != t - 1 and j != t and j != t + 1:
+				valid = False
+		if not valid:
+			continue
+		
+
 		parts = []
 		parts.append(str(line_num))
 		parts.append(str(t))

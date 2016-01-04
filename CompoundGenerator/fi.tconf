@@ -1,0 +1,21 @@
+global {
+  ducttape_output="/home/austinma/Systems/compounds_fi"
+  parallel_data="/usr0/home/austinma/git/Pipelines/CompoundGenerator/finnish/parallel.enfi.gz"
+  source_trees="/dev/null"
+
+  train_compounds="/usr0/home/austinma/git/Pipelines/CompoundGenerator/finnish/train_compounds.gz"
+  dev_compounds=(DevSet:
+    train="/usr0/home/austinma/git/Pipelines/CompoundGenerator/finnish/train_compounds.gz"
+    filtered="/usr0/home/austinma/git/Pipelines/CompoundGenerator/finnish/train.filtered.logprob.enfi.gz"
+    smaller="/usr0/home/austinma/git/Pipelines/CompoundGenerator/finnish/train.filtered.logprob.enfi.head.gz"
+    tiny_fake="/usr0/home/austinma/git/Pipelines/CompoundGenerator/finnish/tiny_fake_dev.gz")
+  test_compounds="/usr0/home/austinma/wmt_phrases.txt"
+
+  brown_clusters="/home/austinma/enfi/wmt/brown/fi600tc/paths.gz"
+}
+
+plan All {
+    #reach EvaluateCER, EvaluateMRR, EvaluateReachability via (TuningIterations: 2) * (LengthLimit: 5) * (POSLatticeFeatures: yes) * (DecodeSet: test dev) * (PruneSuffixes: yes) * (PruneGrammar: yes)
+    reach EvaluateCER, EvaluateMRR, EvaluateReachability via (TuningIterations: 10) * (LengthLimit: 5) * (POSLatticeFeatures: yes) * (DecodeSet: dev) * (PruneSuffixes: yes) * (PruneGrammar: yes) * (DevSet: smaller) * (UseMedialSuffixes: no) * (UseFinalSuffixes: yes)
+    #reach EvaluateCER, EvaluateMRR via (TuningIterations: 1) * (LengthLimit: 4) * (POSLatticeFeatures: yes) * (DecodeSet: test dev) * (PruneSuffixes: yes) * (PruneGrammar: yes) * (DevSet: smaller) * (UseMedialSuffixes: no) * (UseFinalSuffixes: yes)
+}
