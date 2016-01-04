@@ -96,7 +96,8 @@ task MakeCdecIni
     :: source_cluster_map=@
     :: target_cluster_map=@
     :: scfg_max_span_limit=@ 
-    :: cubepruning_pop_limit=@ {
+    :: cubepruning_pop_limit=@
+    :: compound_grammar=@ {
   echo "formalism=scfg" > $cdec_ini
   echo "scfg_max_span_limit=$scfg_max_span_limit" >> $cdec_ini
   echo "cubepruning_pop_limit=$cubepruning_pop_limit" >> $cdec_ini
@@ -126,11 +127,12 @@ task MakeCdecIni
   if [[ $oxlm_language_model != "/dev/null" ]]; then
     echo "feature_function=External $oxlm_module_path --file $oxlm_model_path $oxlm_flags" >> $cdec_ini
   fi
+  echo "grammar=$compound_grammar" >> $cdec_ini
 }
 
 task Tune
     < tune_set=$wrapped_corpus@ExtractGrammars[DataSection:tune]
-    < cdec_ini=@MakeCdecIni
+    < cdec_ini=@MakeCdecIni[TuneOrTest:tune]
     > mira_work
     > optimized_weights
     :: metric_flag=(TuneMetric:
@@ -148,7 +150,7 @@ task Tune
 
 task TuneWithMert
     < tune_set=$wrapped_corpus@ExtractGrammars[DataSection:tune]
-    < cdec_ini=@MakeCdecIni
+    < cdec_ini=@MakeCdecIni[TuneOrTest:tune]
     > mert_work
     > optimized_weights
     :: metric_flag=(TuneMetric:
