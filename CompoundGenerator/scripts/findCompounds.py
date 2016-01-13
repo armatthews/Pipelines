@@ -58,6 +58,7 @@ def hyphen_length(target, j):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--min_length', '-n', type=int, default=5, help='minimum length of target-side compound words')
+parser.add_argument('--max_length', '-m', type=int, default=5, help='maximum length of source-side phrases')
 args = parser.parse_args()
 
 line_num = 0
@@ -96,7 +97,7 @@ for line in sys.stdin:
 		# Criterion 3
 		min_i = min(alignments)
 		max_i = max(alignments)
-		if max_i - min_i >= 5:
+		if max_i - min_i >= args.max_length:
 			continue
 
 		# Criterion 4
