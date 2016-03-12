@@ -201,8 +201,12 @@ task Decode
     :: script_dir=@
     :: .submitter=$full_node_scheduler .walltime="6:00:00" .cpus=$many_cpus .vmem=$big_task .q=normal {
 
-  cat $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | $script_dir/embarrassingly_parallel.sh $cores cdec -c $cdec_ini -w $weights -k $k -r > $kbest
+  cat $test_set | $cdec_dir/corpus/cut-corpus.pl 1 | $script_dir/embarrassingly_parallel.sh $cores $cdec_dir/decoder/cdec -c $cdec_ini -w $weights -k $k -r > $kbest
   sed 's/ ||| /\t/g' $kbest | sort -u -k 1,1 -n | cut -f 2 | sed 's/<\/\?s>//g' | sed 's/\s\+/ /g' | sed 's/^\s*\|\s*$//g' > $output
+  if [[ $(cat $output | wc -l) != $(cat $test_set | wc -l) ]]; then
+    echo 'cdec did not output the correct number of lines!' >&2
+    exit 1
+  fi
 }
 
 task Evaluate 
