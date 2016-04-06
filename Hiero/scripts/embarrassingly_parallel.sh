@@ -3,9 +3,9 @@ set -eou pipefail
 
 pieces=$1
 shift
-file=$1
-shift
 command="$@"
+
+echo "Command: $command" >&2
 
 temp_dir=$(mktemp -d --tmpdir=$HOME/tmp)
 echo "Using temporary directory $temp_dir" >&2
