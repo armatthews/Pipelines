@@ -10,11 +10,10 @@ command="$@"
 temp_dir=$(mktemp -d --tmpdir=$HOME/tmp)
 echo "Using temporary directory $temp_dir" >&2
 
-ln -s $PWD/$file $temp_dir/input
-#while read -r line
-#do
-#  echo "$line" >> $temp_dir/input
-#done
+while read -r line
+do
+  echo "$line" >> $temp_dir/input
+done
 
 line_count=$(cat ${temp_dir}/input | wc -l)
 lines_per_part=$(expr $(expr $line_count + $pieces - 1) / $pieces)
