@@ -1,0 +1,125 @@
+global {
+    # Output directory:
+    ducttape_output="/usr1/data/austinma/blitz/ducttape"
+
+    train_source=(LangPair:
+      jaen="/usr1/data/austinma/blitz/data/enja/train.ja"
+      enja="/usr1/data/austinma/blitz/data/enja/train.en"
+      deen="/usr1/data/austinma/blitz/data/ende/train.de"
+      ende="/usr1/data/austinma/blitz/data/ende/train.en"
+      ruen="/usr1/data/austinma/blitz/data/enru/train.ru"
+      enru="/usr1/data/austinma/blitz/data/enru/train.en"
+      csen="/usr1/data/austinma/blitz/data/encs/train.cs"
+      encs="/usr1/data/austinma/blitz/data/encs/train.en"
+      tren="/usr1/data/austinma/blitz/data/entr/train.tr"
+      entr="/usr1/data/austinma/blitz/data/entr/train.en"
+      fren="/usr1/data/austinma/blitz/data/enfr/train.fr"
+      enfr="/usr1/data/austinma/blitz/data/enfr/train.en")
+
+    train_target=(LangPair:
+      jaen="/usr1/data/austinma/blitz/data/enja/train.en"
+      enja="/usr1/data/austinma/blitz/data/enja/train.ja"
+      deen="/usr1/data/austinma/blitz/data/ende/train.en"
+      ende="/usr1/data/austinma/blitz/data/ende/train.de"
+      ruen="/usr1/data/austinma/blitz/data/enru/train.en"
+      enru="/usr1/data/austinma/blitz/data/enru/train.ru"
+      csen="/usr1/data/austinma/blitz/data/encs/train.en"
+      encs="/usr1/data/austinma/blitz/data/encs/train.cs"
+      tren="/usr1/data/austinma/blitz/data/entr/train.en"
+      entr="/usr1/data/austinma/blitz/data/entr/train.tr"
+      fren="/usr1/data/austinma/blitz/data/enfr/train.en"
+      enfr="/usr1/data/austinma/blitz/data/enfr/train.fr")
+
+    dev_source=(LangPair:
+      jaen="/usr1/data/austinma/blitz/data/enja/dev.ja"
+      enja="/usr1/data/austinma/blitz/data/enja/dev.en"
+      deen="/usr1/data/austinma/blitz/data/ende/test2015.de"
+      ende="/usr1/data/austinma/blitz/data/ende/test2015.en"
+      ruen="/usr1/data/austinma/blitz/data/enru/test2015.ru"
+      enru="/usr1/data/austinma/blitz/data/enru/test2015.en"
+      csen="/usr1/data/austinma/blitz/data/encs/test2015.cs"
+      encs="/usr1/data/austinma/blitz/data/encs/test2015.en"
+      tren="/usr1/data/austinma/blitz/data/entr/dev.tr"
+      entr="/usr1/data/austinma/blitz/data/entr/dev.en"
+      fren="/usr1/data/austinma/blitz/data/enfr/test2013.fr"
+      enfr="/usr1/data/austinma/blitz/data/enfr/test2013.en")
+
+
+    dev_target=(LangPair:
+      jaen="/usr1/data/austinma/blitz/data/enja/dev.en"
+      enja="/usr1/data/austinma/blitz/data/enja/dev.ja"
+      deen="/usr1/data/austinma/blitz/data/ende/test2015.en"
+      ende="/usr1/data/austinma/blitz/data/ende/test2015.de"
+      ruen="/usr1/data/austinma/blitz/data/enru/test2015.en"
+      enru="/usr1/data/austinma/blitz/data/enru/test2015.ru"
+      csen="/usr1/data/austinma/blitz/data/encs/test2015.en"
+      encs="/usr1/data/austinma/blitz/data/encs/test2015.cs"
+      tren="/usr1/data/austinma/blitz/data/entr/dev.en"
+      entr="/usr1/data/austinma/blitz/data/entr/dev.tr"
+      fren="/usr1/data/austinma/blitz/data/enfr/test2013.en"
+      enfr="/usr1/data/austinma/blitz/data/enfr/test2013.fr")
+
+    test_source=(LangPair:
+      jaen="/usr1/data/austinma/blitz/data/enja/test.ja"
+      enja="/usr1/data/austinma/blitz/data/enja/test.en"
+      deen="/usr1/data/austinma/blitz/data/ende/test2016.de"
+      ende="/usr1/data/austinma/blitz/data/ende/test2016.en"
+      ruen="/usr1/data/austinma/blitz/data/enru/test2016.ru"
+      enru="/usr1/data/austinma/blitz/data/enru/test2016.en"
+      csen="/usr1/data/austinma/blitz/data/encs/test2016.cs"
+      encs="/usr1/data/austinma/blitz/data/encs/test2016.en"
+      tren="/usr1/data/austinma/blitz/data/entr/test.tr"
+      entr="/usr1/data/austinma/blitz/data/entr/test.en"
+      fren="/usr1/data/austinma/blitz/data/enfr/test2014.fr"
+      enfr="/usr1/data/austinma/blitz/data/enfr/test2014.en")
+
+    test_target=(LangPair:
+      jaen="/usr1/data/austinma/blitz/data/enja/test.en"
+      enja="/usr1/data/austinma/blitz/data/enja/test.ja"
+      deen="/usr1/data/austinma/blitz/data/ende/test2016.en"
+      ende="/usr1/data/austinma/blitz/data/ende/test2016.de"
+      ruen="/usr1/data/austinma/blitz/data/enru/test2016.en"
+      enru="/usr1/data/austinma/blitz/data/enru/test2016.ru"
+      csen="/usr1/data/austinma/blitz/data/encs/test2016.en"
+      encs="/usr1/data/austinma/blitz/data/encs/test2016.cs"
+      tren="/usr1/data/austinma/blitz/data/entr/test.en"
+      entr="/usr1/data/austinma/blitz/data/entr/test.tr"
+      fren="/usr1/data/austinma/blitz/data/enfr/test2014.en"
+      enfr="/usr1/data/austinma/blitz/data/enfr/test2014.fr")
+
+  eval_measure=(Metric:
+    bleu1="bleu:smooth=1"
+    ter="ter:inverse=true")
+}
+
+global {
+    meteor_task="li"
+    meteor_lang="other"
+
+    lamtram_dir="/usr0/home/austinma/git/lamtram-gpu"
+    fast_align="/usr0/home/austinma/git/fast_align/build/fast_align"
+    multeval="/usr0/home/austinma/git/multeval/multeval.sh"
+}
+
+plan Full {
+  # Already done:
+  reach Evaluate via (LangPair: jaen enja deen ende ruen enru csen encs tren entr fren enfr) * (DevOrTest: test dev) * (MinRisk: no)
+  reach Evaluate via (LangPair: enja) * (DevOrTest: test dev) * (MinRisk: no yes)
+  reach Evaluate via (LangPair: jaen) * (DevOrTest: test dev) * (MinRisk: no yes)
+  reach Evaluate via (LangPair: csen) * (DevOrTest: test dev) * (MinRisk: no yes)
+  reach Evaluate via (LangPair: deen) * (DevOrTest: test dev) * (MinRisk: no yes)
+  reach Evaluate via (LangPair: enfr) * (DevOrTest: test dev) * (MinRisk: no yes)
+  reach Evaluate via (LangPair: fren) * (DevOrTest: test dev) * (MinRisk: no yes)
+  reach Evaluate via (LangPair: ende) * (DevOrTest: test dev) * (MinRisk: no yes) # 15 samples
+
+  # Now running:
+  #reach Evaluate via (LangPair: encs) * (DevOrTest: test dev) * (MinRisk: no yes) # 15 samples
+  #reach Evaluate via (LangPair: enru) * (DevOrTest: test dev) * (MinRisk: no yes) # 15 samples
+  reach Evaluate via (LangPair: ende) * (DevOrTest: test dev) * (MinRisk: no yes) * (Metric: ter) # 15 samples
+
+  # To run in the future:
+  #reach Evaluate via (LangPair: ruen) * (DevOrTest: test dev) * (MinRisk: no yes) # Wants more RAM for dev set
+
+  # Prob not going to bother running this:
+  #reach Evaluate via (LangPair: tren entr) * (DevOrTest: test dev) * (MinRisk: no yes)
+}
