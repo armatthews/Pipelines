@@ -104,10 +104,9 @@ task TrainMinRisk
     --minrisk_scaling $minrisk_scaling \
     --minrisk_include_ref false \
     --eval_meas $eval_meas \
-    --model_in /tmp/model.enru2 \
+    --model_in $model_in \
     --model_out $model > ./log 2>&1
 }
-    #--model_in $model_in \
 
 task Test
   < input=(DevOrTest:
