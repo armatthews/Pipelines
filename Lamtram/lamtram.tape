@@ -89,7 +89,7 @@ task TrainMinRisk
   :: lamtram_dir=@
   {
   $lamtram_dir/src/lamtram/lamtram-train \
-    --cnn_mem 5000,5000,1800 \
+    --cnn_mem 4850,4850,1800 \
     --model_type encatt \
     --train_src $train_source \
     --train_trg $train_target \
@@ -104,9 +104,10 @@ task TrainMinRisk
     --minrisk_scaling $minrisk_scaling \
     --minrisk_include_ref false \
     --eval_meas $eval_meas \
-    --model_in $model_in \
+    --model_in /tmp/model.enru2 \
     --model_out $model > ./log 2>&1
 }
+    #--model_in $model_in \
 
 task Test
   < input=(DevOrTest:

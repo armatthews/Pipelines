@@ -89,7 +89,8 @@ global {
 
   eval_measure=(Metric:
     bleu1="bleu:smooth=1"
-    ter="ter:inverse=true")
+    ter="ter:inverse=true"
+    meteor="extern:run=/usr0/home/austinma/git/lamtram-gpu/contrib/meteor.py")
 }
 
 global {
@@ -101,25 +102,30 @@ global {
     multeval="/usr0/home/austinma/git/multeval/multeval.sh"
 }
 
-plan Full {
+plan Baselines {
   # Already done:
   reach Evaluate via (LangPair: jaen enja deen ende ruen enru csen encs tren entr fren enfr) * (DevOrTest: test dev) * (MinRisk: no)
-  reach Evaluate via (LangPair: enja) * (DevOrTest: test dev) * (MinRisk: no yes)
-  reach Evaluate via (LangPair: jaen) * (DevOrTest: test dev) * (MinRisk: no yes)
-  reach Evaluate via (LangPair: csen) * (DevOrTest: test dev) * (MinRisk: no yes)
-  reach Evaluate via (LangPair: deen) * (DevOrTest: test dev) * (MinRisk: no yes)
-  reach Evaluate via (LangPair: enfr) * (DevOrTest: test dev) * (MinRisk: no yes)
-  reach Evaluate via (LangPair: fren) * (DevOrTest: test dev) * (MinRisk: no yes)
-  reach Evaluate via (LangPair: ende) * (DevOrTest: test dev) * (MinRisk: no yes) # 15 samples
+}
+
+plan MinRiskBLEU {
+  #reach Evaluate via (LangPair: enja) * (DevOrTest: test dev) * (MinRisk: no yes)
+  #reach Evaluate via (LangPair: jaen) * (DevOrTest: test dev) * (MinRisk: no yes)
+  #reach Evaluate via (LangPair: csen) * (DevOrTest: test dev) * (MinRisk: no yes)
+  #reach Evaluate via (LangPair: deen) * (DevOrTest: test dev) * (MinRisk: no yes)
+  #reach Evaluate via (LangPair: enfr) * (DevOrTest: test dev) * (MinRisk: no yes)
+  #reach Evaluate via (LangPair: fren) * (DevOrTest: test dev) * (MinRisk: no yes)
+  #reach Evaluate via (LangPair: ende) * (DevOrTest: test dev) * (MinRisk: no yes) # 15 samples
+  reach Evaluate via (LangPair: encs) * (DevOrTest: test dev) * (MinRisk: no yes) # 15 samples
 
   # Now running:
-  #reach Evaluate via (LangPair: encs) * (DevOrTest: test dev) * (MinRisk: no yes) # 15 samples
-  #reach Evaluate via (LangPair: enru) * (DevOrTest: test dev) * (MinRisk: no yes) # 15 samples
-  reach Evaluate via (LangPair: ende) * (DevOrTest: test dev) * (MinRisk: no yes) * (Metric: ter) # 15 samples
-
-  # To run in the future:
-  #reach Evaluate via (LangPair: ruen) * (DevOrTest: test dev) * (MinRisk: no yes) # Wants more RAM for dev set
+  reach Evaluate via (LangPair: enru) * (DevOrTest: test dev) * (MinRisk: no yes) # 15 samples
+  #reach Evaluate via (LangPair: ruen) * (DevOrTest: test dev) * (MinRisk: no yes) # 15 samples
 
   # Prob not going to bother running this:
   #reach Evaluate via (LangPair: tren entr) * (DevOrTest: test dev) * (MinRisk: no yes)
+
+}
+
+plan MinRiskEnDe {
+  reach Evaluate via (LangPair: ende) * (DevOrTest: test dev) * (MinRisk: no yes) * (Metric: bleu1 ter meteor) # 15 samples
 }
