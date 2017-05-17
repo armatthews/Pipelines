@@ -1,0 +1,33 @@
+global {
+    # Output directory:
+    ducttape_output="/usr1/data/austinma/btec_ducttape"
+
+    train_source="/usr0/home/austinma/git/AttentionalModel/btec/train.zh"
+    train_target="/usr0/home/austinma/git/AttentionalModel/btec/train.en"
+
+    dev_source="/usr0/home/austinma/git/AttentionalModel/btec/dev.zh"
+    dev_target="/usr0/home/austinma/git/AttentionalModel/btec/dev.en"
+
+    test_source="/usr0/home/austinma/git/AttentionalModel/btec/test.zh"
+    test_target="/usr0/home/austinma/git/AttentionalModel/btec/test.en"
+
+    eval_measure="bleu:smooth=1"
+}
+
+global {
+    meteor_task="li"
+    meteor_lang="other"
+
+    vocab_size=6000
+
+    lamtram_dir="/usr0/home/austinma/git/lamtram-gpu"
+    fast_align="/usr0/home/austinma/git/fast_align/build/fast_align"
+    multeval="/usr0/home/austinma/git/multeval/multeval.sh"
+    sentence_piece_dir="/usr0/home/austinma/git/sentencepiece"
+}
+
+plan Baseline {
+  reach EncodeSentencePiece via (DataSection: train dev test)
+  reach MakeProbTable
+  reach Evaluate via (DevOrTest: test dev) * (MinRisk: no)
+}
