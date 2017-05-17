@@ -20,14 +20,12 @@ global {
 
     vocab_size=6000
 
-    lamtram_dir="/usr0/home/austinma/git/lamtram-gpu"
+    lamtram_dir="/usr0/home/austinma/git/lamtram"
     fast_align="/usr0/home/austinma/git/fast_align/build/fast_align"
     multeval="/usr0/home/austinma/git/multeval/multeval.sh"
     sentence_piece_dir="/usr0/home/austinma/git/sentencepiece"
 }
 
 plan Baseline {
-  reach EncodeSentencePiece via (DataSection: train dev test)
-  reach MakeProbTable
   reach Evaluate via (DevOrTest: test dev) * (MinRisk: no)
 }
