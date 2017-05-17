@@ -142,7 +142,7 @@ task TrainMinRisk
   :: run_number=(MinRiskRun: 1 2 3)
   {
   $lamtram_dir/src/lamtram/lamtram-train \
-    --cnn_mem 4850,4850,1800 \
+    --dynet_mem 4850,4850,1800 \
     --model_type encatt \
     --train_src $train_source \
     --train_trg $train_target \
