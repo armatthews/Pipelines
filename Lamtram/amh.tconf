@@ -1,0 +1,31 @@
+global {
+    # Output directory:
+    ducttape_output="/usr1/data/austinma/amh_ducttape"
+
+    train_source="/usr0/home/austinma/git/Pipelines/Lamtram/amh-dryrun/set0-train.amh"
+    train_target="/usr0/home/austinma/git/Pipelines/Lamtram/amh-dryrun/set0-train.amh"
+
+    dev_source="/usr0/home/austinma/git/Pipelines/Lamtram/amh-dryrun/set0-dev.amh"
+    dev_target="/usr0/home/austinma/git/Pipelines/Lamtram/amh-dryrun/set0-dev.amh"
+
+    test_source="/usr0/home/austinma/git/Pipelines/Lamtram/amh-dryrun/set0-test.amh"
+    test_target="/usr0/home/austinma/git/Pipelines/Lamtram/amh-dryrun/set0-test.amh"
+
+    eval_measure="bleu:smooth=1"
+}
+
+global {
+    meteor_task="li"
+    meteor_lang="other"
+
+    vocab_size=6000
+
+    lamtram_dir="/usr0/home/austinma/git/lamtram"
+    fast_align="/usr0/home/austinma/git/fast_align/build/fast_align"
+    multeval="/usr0/home/austinma/git/multeval/multeval.sh"
+    sentence_piece_dir="/usr0/home/austinma/git/sentencepiece"
+}
+
+plan Baseline {
+  reach Evaluate via (DevOrTest: test dev) * (MinRisk: no)
+}
